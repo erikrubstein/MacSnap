@@ -54,8 +54,11 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
     }
 
     private func setupMenuBarItem() {
-        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
-        item.button?.title = "GridSnap"
+        let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+        item.button?.title = ""
+        item.button?.image = menuBarIcon()
+        item.button?.imagePosition = .imageOnly
+        item.button?.toolTip = "MacSnap"
 
         let menu = NSMenu()
         profilesMenuItem.submenu = profilesMenu
@@ -78,6 +81,16 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
         item.menu = menu
         statusItem = item
         refreshMenuState()
+    }
+
+    private func menuBarIcon() -> NSImage? {
+        let image = Bundle.module.url(forResource: "MacSnapIcon", withExtension: "svg")
+            .flatMap(NSImage.init(contentsOf:))
+            ?? NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "MacSnap")
+
+        image?.size = NSSize(width: 18, height: 18)
+        image?.isTemplate = true
+        return image
     }
 
     private func requestAccessibilityPermission() {

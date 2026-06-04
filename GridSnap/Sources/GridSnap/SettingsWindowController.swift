@@ -48,7 +48,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             backing: .buffered,
             defer: false
         )
-        window.title = "GridSnap Settings"
+        window.title = "MacSnap Settings"
         window.center()
         window.isReleasedWhenClosed = false
 
@@ -320,7 +320,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "GridSnap needs Accessibility permission before snapping can work.")
+        let labelView = NSTextField(labelWithString: "MacSnap needs Accessibility permission before snapping can work.")
         labelView.widthAnchor.constraint(equalToConstant: 380).isActive = true
 
         let openButton = NSButton(title: "Open Settings", target: self, action: #selector(openAccessibilitySettings))

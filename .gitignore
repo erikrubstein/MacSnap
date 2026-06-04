@@ -1,6 +1,7 @@
 .DS_Store
 *.xcuserstate
 *.xcuserdata/
+.vscode/
 
 # Swift Package Manager build output
 .build/

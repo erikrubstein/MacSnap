@@ -1,23 +1,20 @@
-# GridSnap
+# MacSnap
 
 Lightweight macOS grid snapping utility.
 
 Current implementation:
 
 - Request Accessibility permission.
-- Register global hotkeys.
-- Find the currently focused window.
-- Move and resize that window through `AXUIElement`.
 - Run as a menu bar utility.
-- Open a minimal settings window.
+- Open a settings window.
 - Persist named grid profiles locally.
 - Convert grid settings into snap target rectangles.
 - Preview the grid overlay on the screen under the mouse.
 - Snap a dragged focused window to a grid cell while the snap modifier is held.
-- Span multiple grid cells with middle click during a snap drag.
+- Span multiple grid cells with a configurable span modifier.
 - Prefer the window under the pointer when snapping, with focused-window fallback.
 - Retry failed snaps with a refreshed Accessibility window reference.
-- Configure snap modifier, grid gap, screen frame mode, and Option span behavior.
+- Configure snap modifier, span modifier, grid gap, screen frame mode, overlay colors, and restore-on-unsnap behavior.
 - Switch between profiles with optional custom shortcuts.
 
 ## Run
@@ -26,7 +23,7 @@ Current implementation:
 swift run
 ```
 
-The app appears in the menu bar as `GridSnap`.
+The app appears in the menu bar as the MacSnap icon.
 
 If Swift asks which executable to run, use:
 
@@ -36,32 +33,33 @@ swift run GridSnap
 
 ## Settings
 
-Open the `GridSnap` menu bar item and choose `Settings...`.
+Open the MacSnap menu bar item and choose `Settings...`.
 
-The settings window is split into Profile, Global, and System sections.
+The settings window is split into Profiles, Global, Appearance, and conditional Permissions sections.
 
 The Profile section includes:
 
 - Profile table with active profile, name, grid, gap, and shortcut.
-- Add, Edit, and Delete buttons.
+- Add, Edit, Delete, Up, and Down buttons.
 - A smaller Edit Profile window for name, rows, columns, gap, and shortcut.
 
 The Global section includes:
 
 - Snap modifier, default `Shift`.
+- Span modifier, default `Middle Click`.
 - Whether snapping avoids the menu bar and Dock.
-- Whether `Option` can be used as a span modifier for trackpads.
+- Whether dragging a snapped window restores its pre-snap size.
 
-The System section includes:
+The Appearance section includes:
 
-- Accessibility permission status.
+- Background color.
+- Grid line color.
+- Selection color.
+
+The Permissions section appears only when Accessibility permission is missing. It includes:
+
+- A brief permission message.
 - Buttons to refresh permission status and open Accessibility settings.
-
-## Overlay Preview
-
-Open the `GridSnap` menu bar item and choose `Preview Grid Overlay`.
-
-The preview uses your current rows and columns, appears on the screen under the mouse, and highlights the hovered cell. Choose `Hide Grid Overlay` to dismiss it.
 
 ## Drag Snap
 
@@ -69,7 +67,7 @@ Run the app, then drag a normal app window while holding the configured snap mod
 
 While the modifier is held during the drag, the grid overlay appears on the screen under the mouse and highlights the hovered cell. Release the mouse while the highlight is visible to snap the dragged window into that cell.
 
-To span multiple cells, keep dragging with the snap modifier, press middle click while the first cell is highlighted, move across the grid, then release the left mouse button while the span is highlighted. If enabled in settings, `Option` can also anchor and expand the span for trackpad use.
+To span multiple cells, keep dragging with the snap modifier, press the configured span modifier while the first cell is highlighted, move across the grid, then release the left mouse button while the span is highlighted.
 
 The app first tries to target the window under the pointer, then falls back to the focused window if needed.
 
@@ -77,13 +75,11 @@ The app first tries to target the window under the pointer, then falls back to t
 
 Each profile has its own name, rows, columns, gap, and optional switch shortcut.
 
-Use `Settings...` to add, edit, and delete profiles. Selecting a row makes that profile active. Edit opens a smaller profile window where you can change the profile name, rows, columns, gap, and shortcut. To set a shortcut, click the shortcut control and press the key combination you want. Switching profiles updates the active grid immediately, including overlay preview and future snaps.
+Use `Settings...` to add, edit, delete, and reorder profiles. Selecting a row makes that profile active. Edit opens a smaller profile window where you can change the profile name, rows, columns, gap, and shortcut. To set a shortcut, click the shortcut control and press the key combination you want. Switching profiles updates the active grid immediately and briefly previews the grid.
 
 ## Hotkeys
 
-- `Ctrl + Option + Left`: snap the focused window to the left half of the current screen.
-- `Ctrl + Option + Right`: snap the focused window to the right half of the current screen.
-- Custom profile shortcuts: switch to profiles that have shortcuts assigned.
+Custom profile shortcuts switch to profiles that have shortcuts assigned.
 
 ## Geometry Checks
 

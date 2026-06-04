@@ -13,7 +13,10 @@ let package = Package(
         ),
         .executableTarget(
             name: "GridSnap",
-            dependencies: ["GridSnapCore"]
+            dependencies: ["GridSnapCore"],
+            resources: [
+                .process("Resources")
+            ]
         ),
         .executableTarget(
             name: "GridSnapGeometryCheck",
