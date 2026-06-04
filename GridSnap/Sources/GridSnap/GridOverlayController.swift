@@ -106,7 +106,7 @@ private final class GridOverlayView: NSView {
     private var gridAppearance = GridAppearance(
         backgroundColor: GridColor(red: 0, green: 0, blue: 0, alpha: 0.10),
         gridLineColor: GridColor(red: 1, green: 1, blue: 1, alpha: 0.64),
-        selectionColor: GridColor(red: 0, green: 0.48, blue: 1, alpha: 0.32)
+        selectionColor: GridColor(red: 0.86, green: 0.86, blue: 0.86, alpha: 0.34)
     )
 
     override var isFlipped: Bool {

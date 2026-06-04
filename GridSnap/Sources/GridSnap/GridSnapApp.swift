@@ -134,8 +134,10 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
         refreshMenuState()
         configureProfileHotkeys()
 
-        if didSwitchProfile || shouldFlashGrid {
-            flashGridLayout()
+        if shouldFlashGrid {
+            flashGridLayout(selection: .sampleCell)
+        } else if didSwitchProfile {
+            flashGridLayout(selection: .none)
         }
     }
 
@@ -186,7 +188,7 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
         lastKnownActiveProfileID = settingsStore.activeProfileID
         refreshMenuState()
         settingsWindowController?.reload()
-        flashGridLayout()
+        flashGridLayout(selection: .none)
     }
 
     @objc private func showSettings() {
@@ -203,9 +205,9 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
         switchToProfile(id: id)
     }
 
-    private func flashGridLayout() {
+    private func flashGridLayout(selection: OverlaySelectionMode) {
         flashTimer?.invalidate()
-        _ = showCurrentGridOverlay(selection: .none)
+        _ = showCurrentGridOverlay(selection: selection)
         flashTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.overlayController.hide()
@@ -216,6 +218,7 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
 
     private enum OverlaySelectionMode {
         case none
+        case sampleCell
     }
 
     @discardableResult
@@ -229,7 +232,13 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
         let settings = settingsStore.settings
         let frame = screenFrame(for: screen, settings: settings)
         let model = GridModel(settings: settings)
-        let selection: GridSelection? = nil
+        let selection: GridSelection?
+        switch selectionMode {
+        case .none:
+            selection = nil
+        case .sampleCell:
+            selection = GridSelection(cell: GridCell(row: settings.rows / 2, column: settings.columns / 2))
+        }
         overlayController.update(
             on: screen,
             model: model,

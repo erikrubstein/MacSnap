@@ -28,7 +28,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private let gridLineColorWell = NSColorWell()
     private let selectionColorWell = NSColorWell()
     private var permissionSection: NSView?
-    private let rowLabelWidth: CGFloat = 170
+    private let rowLabelWidth: CGFloat = 230
 
     private var isRefreshing = false
     private var profileEditorWindowController: ProfileEditorWindowController?
