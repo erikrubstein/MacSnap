@@ -1,14 +1,14 @@
 import AppKit
 import ApplicationServices
 import Carbon
-import GridSnapCore
+import MacSnapCore
 
 @_silgen_name("_AXUIElementGetWindow")
 private func AXUIElementGetWindowID(_ element: AXUIElement, _ identifier: UnsafeMutablePointer<CGWindowID>) -> AXError
 
 @main
 @MainActor
-final class GridSnapApp: NSObject, NSApplicationDelegate {
+final class MacSnapApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var profileHotKeyManager: HotKeyManager?
     private var settingsWindowController: SettingsWindowController?
@@ -24,7 +24,7 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
 
     static func main() {
         let app = NSApplication.shared
-        let delegate = GridSnapApp()
+        let delegate = MacSnapApp()
         app.delegate = delegate
         app.setActivationPolicy(.accessory)
         app.run()
@@ -96,9 +96,9 @@ final class GridSnapApp: NSObject, NSApplicationDelegate {
     private func requestAccessibilityPermission() {
         let trusted = PermissionManager.requestAccessibilityPermission()
         if trusted {
-            NSLog("GridSnap: Accessibility permission is already granted.")
+            NSLog("MacSnap: Accessibility permission is already granted.")
         } else {
-            NSLog("GridSnap: Accessibility permission is required before snapping will work.")
+            NSLog("MacSnap: Accessibility permission is required before snapping will work.")
         }
     }
 
@@ -314,12 +314,12 @@ final class HotKeyManager {
         )
 
         guard status == noErr, let hotKeyRef else {
-            NSLog("GridSnap: Failed to register hotkey '\(label)' with status \(status).")
+            NSLog("MacSnap: Failed to register hotkey '\(label)' with status \(status).")
             return
         }
 
         registrations[id] = Registration(reference: hotKeyRef, action: action, label: label)
-        NSLog("GridSnap: Registered hotkey '\(label)'.")
+        NSLog("MacSnap: Registered hotkey '\(label)'.")
     }
 
     private func installEventHandler() {
@@ -361,17 +361,17 @@ final class HotKeyManager {
         )
 
         if status != noErr {
-            NSLog("GridSnap: Failed to install hotkey event handler with status \(status).")
+            NSLog("MacSnap: Failed to install hotkey event handler with status \(status).")
         }
     }
 
     private func handleHotKey(id: UInt32) {
         guard let registration = registrations[id] else {
-            NSLog("GridSnap: Ignoring unknown hotkey id \(id).")
+            NSLog("MacSnap: Ignoring unknown hotkey id \(id).")
             return
         }
 
-        NSLog("GridSnap: \(registration.label)")
+        NSLog("MacSnap: \(registration.label)")
         registration.action()
     }
 
@@ -408,17 +408,17 @@ final class WindowSnapper {
 
     func snapFocusedWindow(to target: Target) {
         guard AXIsProcessTrusted() else {
-            NSLog("GridSnap: Accessibility permission is missing.")
+            NSLog("MacSnap: Accessibility permission is missing.")
             return
         }
 
         guard let focusedWindow = focusedWindow() else {
-            NSLog("GridSnap: No focused window found.")
+            NSLog("MacSnap: No focused window found.")
             return
         }
 
         guard let screen = screenForFocusedWindow(focusedWindow) ?? NSScreen.main else {
-            NSLog("GridSnap: No screen found.")
+            NSLog("MacSnap: No screen found.")
             return
         }
 
@@ -448,7 +448,7 @@ final class WindowSnapper {
 
     func windowTarget(at point: CGPoint) -> WindowTarget? {
         guard PermissionManager.isAccessibilityTrusted else {
-            NSLog("GridSnap: Accessibility permission is missing.")
+            NSLog("MacSnap: Accessibility permission is missing.")
             return nil
         }
 
@@ -496,7 +496,7 @@ final class WindowSnapper {
 
     func currentFocusedWindowTarget(requireMouseInsideWindow: Bool = false) -> WindowTarget? {
         guard PermissionManager.isAccessibilityTrusted else {
-            NSLog("GridSnap: Accessibility permission is missing.")
+            NSLog("MacSnap: Accessibility permission is missing.")
             return nil
         }
 
@@ -538,7 +538,7 @@ final class WindowSnapper {
             return
         }
 
-        NSLog("GridSnap: Retrying snap with a refreshed window reference.")
+        NSLog("MacSnap: Retrying snap with a refreshed window reference.")
         if move(window: freshElement, to: clampedRect) {
             rememberSnappedState(for: target, snappedRect: clampedRect)
         }
@@ -581,7 +581,7 @@ final class WindowSnapper {
         }
 
         snappedWindowStates.removeValue(forKey: windowID)
-        NSLog("GridSnap: Restored unsnapped window size from \(state.snappedRect.size) to \(state.originalRect.size).")
+        NSLog("MacSnap: Restored unsnapped window size from \(state.snappedRect.size) to \(state.originalRect.size).")
         return true
     }
 
@@ -619,7 +619,7 @@ final class WindowSnapper {
         )
 
         guard result == .success else {
-            NSLog("GridSnap: Could not read focused window. AX error \(result.rawValue).")
+            NSLog("MacSnap: Could not read focused window. AX error \(result.rawValue).")
             return nil
         }
 
@@ -738,7 +738,7 @@ final class WindowSnapper {
 
     private func move(window: AXUIElement, to rect: CGRect) -> Bool {
         guard isResizable(window) else {
-            NSLog("GridSnap: Focused window is not resizable.")
+            NSLog("MacSnap: Focused window is not resizable.")
             return false
         }
 
@@ -748,7 +748,7 @@ final class WindowSnapper {
         guard let positionValue = AXValueCreate(.cgPoint, &position),
               let sizeValue = AXValueCreate(.cgSize, &size)
         else {
-            NSLog("GridSnap: Could not create AX values.")
+            NSLog("MacSnap: Could not create AX values.")
             return false
         }
 
@@ -764,11 +764,11 @@ final class WindowSnapper {
         )
 
         if positionResult == .success, sizeResult == .success {
-            NSLog("GridSnap: Snapped focused window to \(rect).")
+            NSLog("MacSnap: Snapped focused window to \(rect).")
             return true
         } else {
             NSLog(
-                "GridSnap: Snap failed. Position AX error \(positionResult.rawValue), size AX error \(sizeResult.rawValue)."
+                "MacSnap: Snap failed. Position AX error \(positionResult.rawValue), size AX error \(sizeResult.rawValue)."
             )
             return false
         }

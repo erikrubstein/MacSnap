@@ -28,7 +28,7 @@ The app appears in the menu bar as the MacSnap icon.
 If Swift asks which executable to run, use:
 
 ```sh
-swift run GridSnap
+swift run MacSnap
 ```
 
 ## Settings
@@ -86,7 +86,7 @@ Custom profile shortcuts switch to profiles that have shortcuts assigned.
 Run the Phase 2 geometry checks with:
 
 ```sh
-swift run GridSnapGeometryCheck
+swift run MacSnapGeometryCheck
 ```
 
 This validates grid cell lookup, cell rectangles, span rectangles, common grid sizes, multi-monitor-style coordinate offsets, gap insets, and profile storage.

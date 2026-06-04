@@ -3,25 +3,25 @@
 import PackageDescription
 
 let package = Package(
-    name: "GridSnap",
+    name: "MacSnap",
     platforms: [
         .macOS(.v13)
     ],
     targets: [
         .target(
-            name: "GridSnapCore"
+            name: "MacSnapCore"
         ),
         .executableTarget(
-            name: "GridSnap",
-            dependencies: ["GridSnapCore"],
+            name: "MacSnap",
+            dependencies: ["MacSnapCore"],
             resources: [
                 .process("Resources")
             ]
         ),
         .executableTarget(
-            name: "GridSnapGeometryCheck",
-            dependencies: ["GridSnapCore"],
-            path: "Checks/GridSnapGeometryCheck"
+            name: "MacSnapGeometryCheck",
+            dependencies: ["MacSnapCore"],
+            path: "Checks/MacSnapGeometryCheck"
         )
     ]
 )

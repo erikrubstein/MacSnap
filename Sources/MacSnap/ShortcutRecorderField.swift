@@ -1,6 +1,6 @@
 import AppKit
 import Carbon
-import GridSnapCore
+import MacSnapCore
 
 @MainActor
 final class ShortcutRecorderField: NSButton {

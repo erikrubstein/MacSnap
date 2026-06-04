@@ -1,5 +1,5 @@
 import AppKit
-import GridSnapCore
+import MacSnapCore
 
 @MainActor
 final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelegate {

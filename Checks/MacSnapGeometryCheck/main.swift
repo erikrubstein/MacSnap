@@ -1,9 +1,9 @@
 import CoreGraphics
 import Foundation
-import GridSnapCore
+import MacSnapCore
 
 @main
-struct GridSnapGeometryCheck {
+struct MacSnapGeometryCheck {
     static func main() {
         checkCellAtPointUsesRowsFromTopAndColumnsFromLeft()
         checkCellAtPointRejectsPointsOutsideScreenFrame()
@@ -15,7 +15,7 @@ struct GridSnapGeometryCheck {
         checkModelClampsInvalidSettingsAndCells()
         checkProfileStorageAndSwitching()
 
-        print("GridSnapGeometryCheck: all checks passed.")
+        print("MacSnapGeometryCheck: all checks passed.")
     }
 
     private static func checkCellAtPointUsesRowsFromTopAndColumnsFromLeft() {
@@ -119,7 +119,7 @@ struct GridSnapGeometryCheck {
     }
 
     private static func checkProfileStorageAndSwitching() {
-        let suiteName = "GridSnapGeometryCheck-\(UUID().uuidString)"
+        let suiteName = "MacSnapGeometryCheck-\(UUID().uuidString)"
         guard let defaults = UserDefaults(suiteName: suiteName) else {
             fatalError("Could not create isolated UserDefaults suite")
         }
@@ -160,7 +160,7 @@ struct GridSnapGeometryCheck {
 
     private static func expect(_ condition: @autoclosure () -> Bool, file: StaticString = #file, line: UInt = #line) {
         guard condition() else {
-            fatalError("GridSnapGeometryCheck failed at \(file):\(line)")
+            fatalError("MacSnapGeometryCheck failed at \(file):\(line)")
         }
     }
 }

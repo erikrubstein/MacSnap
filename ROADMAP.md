@@ -1,4 +1,4 @@
-# Lightweight Grid Snap App Roadmap
+# MacSnap Roadmap
 
 ## Goal
 
@@ -31,7 +31,7 @@ The app should stay intentionally lightweight. It should solve one workflow well
 
 ## Proposed Architecture
 
-### `GridSnapApp`
+### `MacSnapApp`
 
 Owns app lifecycle, menu bar item, settings window, and startup wiring.
 
@@ -67,7 +67,7 @@ Persists rows, columns, gap size, modifier choice, and related simple preference
 
 Prove that the app can control another window.
 
-Implementation lives in `GridSnap/`.
+Implementation lives in `MacSnap/`.
 
 Status: implemented.
 
@@ -87,7 +87,7 @@ Status: implemented.
 
 Create the real lightweight app foundation.
 
-Implementation lives in `GridSnap/`.
+Implementation lives in `MacSnap/`.
 
 Status: implemented.
 
@@ -110,7 +110,7 @@ Status: implemented.
 
 Implement snapping geometry before wiring global drag behavior.
 
-Implementation lives in `GridSnap/Sources/GridSnapCore/GridModel.swift`.
+Implementation lives in `MacSnap/Sources/MacSnapCore/GridModel.swift`.
 
 Status: implemented.
 
@@ -131,15 +131,15 @@ Status: implemented.
 Validation command:
 
 ```sh
-cd GridSnap
-swift run GridSnapGeometryCheck
+cd MacSnap
+swift run MacSnapGeometryCheck
 ```
 
 ## Phase 3: Overlay
 
 Draw the active grid while snapping is enabled.
 
-Implementation lives in `GridSnap/Sources/GridSnap/GridOverlayController.swift`.
+Implementation lives in `MacSnap/Sources/MacSnap/GridOverlayController.swift`.
 
 Status: implemented. The app includes a menu-driven overlay preview so this phase can be tested before drag snapping exists.
 
@@ -162,7 +162,7 @@ Status: implemented. The app includes a menu-driven overlay preview so this phas
 
 Wire input monitoring, window detection, overlay updates, and snapping.
 
-Implementation lives in `GridSnap/Sources/GridSnap/DragSnapController.swift`.
+Implementation lives in `MacSnap/Sources/MacSnap/DragSnapController.swift`.
 
 Status: implemented. The app snaps the targeted window to the highlighted grid cell on mouse up while the configured snap modifier is held.
 
@@ -185,7 +185,7 @@ Status: implemented. The app snaps the targeted window to the highlighted grid c
 
 Add middle-click span behavior.
 
-Implementation lives in `GridSnap/Sources/GridSnap/DragSnapController.swift`.
+Implementation lives in `MacSnap/Sources/MacSnap/DragSnapController.swift`.
 
 Status: implemented. Middle click or the optional span modifier during a snap drag anchors the first selected cell and expands the highlighted selection to the current cell.
 
@@ -207,7 +207,7 @@ Status: implemented. Middle click or the optional span modifier during a snap dr
 
 Make the MVP dependable for daily use.
 
-Implementation lives mostly in `GridSnap/Sources/GridSnap/GridSnapApp.swift` and `GridSnap/Sources/GridSnap/DragSnapController.swift`.
+Implementation lives mostly in `MacSnap/Sources/MacSnap/MacSnapApp.swift` and `MacSnap/Sources/MacSnap/DragSnapController.swift`.
 
 Status: implemented. The app now prefers under-pointer window targeting, falls back to the focused window, clamps snap rectangles to the active screen, and retries failed snaps with a refreshed Accessibility window reference when possible.
 
@@ -258,7 +258,7 @@ Status: implemented. Profiles allow multiple named grid presets, each with its o
 
 ## Complexity Assessment
 
-This should be much simpler than MacsyZones because it avoids custom layouts, onboarding, licensing, update flows, quick snapper UI, and broad settings surfaces.
+This should stay intentionally small because it avoids custom layouts, onboarding, licensing, update flows, quick snapper UI, and broad settings surfaces.
 
 The hard parts are still real macOS platform issues:
 
