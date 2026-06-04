@@ -1,0 +1,11 @@
+.DS_Store
+*.xcuserstate
+*.xcuserdata/
+
+# Swift Package Manager build output
+.build/
+GridSnap/.build/
+GridSnap/.swiftpm/
+
+# Reference checkout kept outside this MVP repo
+MacsyZones/
