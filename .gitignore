@@ -6,3 +6,6 @@
 # Swift Package Manager build output
 .build/
 .swiftpm/
+
+# Local release artifacts
+dist/

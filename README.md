@@ -14,7 +14,7 @@ Current implementation:
 - Span multiple grid cells with a configurable span modifier.
 - Prefer the window under the pointer when snapping, with focused-window fallback.
 - Retry failed snaps with a refreshed Accessibility window reference.
-- Configure snap modifier, span modifier, grid gap, screen frame mode, overlay colors, and restore-on-unsnap behavior.
+- Configure snap modifier, optional alternate snap modifier, span modifier, optional alternate span modifier, grid gap, screen frame mode, overlay colors, and restore-on-unsnap behavior.
 - Switch between profiles with optional custom shortcuts.
 
 ## Run
@@ -31,6 +31,25 @@ If Swift asks which executable to run, use:
 swift run MacSnap
 ```
 
+## Release DMG
+
+Build an unsigned macOS app bundle and disk image locally with:
+
+```sh
+scripts/build_dmg.sh
+```
+
+The DMG is written to `dist/MacSnap-<version>.dmg`. By default the script builds a universal `arm64` plus `x86_64` app.
+
+GitHub Actions also builds the DMG. Push a version tag to publish it as a release asset:
+
+```sh
+git tag v0.1.0
+git push origin v0.1.0
+```
+
+The app is not Developer ID signed or notarized yet, so macOS Gatekeeper will warn on first launch after download.
+
 ## Settings
 
 Open the MacSnap menu bar item and choose `Settings...`.
@@ -46,7 +65,9 @@ The Profile section includes:
 The Global section includes:
 
 - Snap modifier, default `Shift`.
+- Optional alternate snap modifier, default `None`.
 - Span modifier, default `Middle Click`.
+- Optional alternate span modifier, default `None`.
 - Whether snapping avoids the menu bar and Dock.
 - Whether dragging a snapped window restores its pre-snap size.
 

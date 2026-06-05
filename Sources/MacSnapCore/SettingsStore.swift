@@ -26,7 +26,9 @@ public struct GridSettings: Equatable, Sendable {
     public var columns: Int
     public var gap: Int
     public var snapModifier: SnapModifier
+    public var alternateSnapModifier: SnapModifier?
     public var spanModifier: SnapModifier
+    public var alternateSpanModifier: SnapModifier?
     public var useVisibleFrame: Bool
     public var restoreSizeOnUnsnap: Bool
     public var appearance: GridAppearance
@@ -36,7 +38,9 @@ public struct GridSettings: Equatable, Sendable {
         columns: Int,
         gap: Int,
         snapModifier: SnapModifier,
+        alternateSnapModifier: SnapModifier? = nil,
         spanModifier: SnapModifier,
+        alternateSpanModifier: SnapModifier? = nil,
         useVisibleFrame: Bool,
         restoreSizeOnUnsnap: Bool,
         appearance: GridAppearance
@@ -45,7 +49,9 @@ public struct GridSettings: Equatable, Sendable {
         self.columns = columns
         self.gap = gap
         self.snapModifier = snapModifier
+        self.alternateSnapModifier = alternateSnapModifier
         self.spanModifier = spanModifier
+        self.alternateSpanModifier = alternateSpanModifier
         self.useVisibleFrame = useVisibleFrame
         self.restoreSizeOnUnsnap = restoreSizeOnUnsnap
         self.appearance = appearance
@@ -281,7 +287,9 @@ public final class SettingsStore {
         static let profiles = "gridProfiles"
         static let activeProfileID = "activeProfileID"
         static let snapModifier = "snapModifier"
+        static let alternateSnapModifier = "alternateSnapModifier"
         static let spanModifier = "spanModifier"
+        static let alternateSpanModifier = "alternateSpanModifier"
         static let useVisibleFrame = "useVisibleFrame"
         static let restoreSizeOnUnsnap = "restoreSizeOnUnsnap"
         static let gridAppearance = "gridAppearance"
@@ -292,7 +300,9 @@ public final class SettingsStore {
         columns: 4,
         gap: 0,
         snapModifier: .shift,
+        alternateSnapModifier: nil,
         spanModifier: .middleClick,
+        alternateSpanModifier: nil,
         useVisibleFrame: true,
         restoreSizeOnUnsnap: true,
         appearance: GridAppearance(
@@ -326,7 +336,9 @@ public final class SettingsStore {
                 columns: columns,
                 gap: gap,
                 snapModifier: snapModifier,
+                alternateSnapModifier: alternateSnapModifier,
                 spanModifier: spanModifier,
+                alternateSpanModifier: alternateSpanModifier,
                 useVisibleFrame: useVisibleFrame,
                 restoreSizeOnUnsnap: restoreSizeOnUnsnap,
                 appearance: appearance
@@ -337,7 +349,9 @@ public final class SettingsStore {
             columns = newValue.columns
             gap = newValue.gap
             snapModifier = newValue.snapModifier
+            alternateSnapModifier = newValue.alternateSnapModifier
             spanModifier = newValue.spanModifier
+            alternateSpanModifier = newValue.alternateSpanModifier
             useVisibleFrame = newValue.useVisibleFrame
             restoreSizeOnUnsnap = newValue.restoreSizeOnUnsnap
             appearance = newValue.appearance
@@ -528,6 +542,35 @@ public final class SettingsStore {
             if newValue == spanModifier {
                 spanModifier = Self.fallbackSpanModifier(for: newValue)
             }
+            sanitizeOptionalModifiers()
+        }
+    }
+
+    public var alternateSnapModifier: SnapModifier? {
+        get {
+            let modifier = rawOptionalModifier(for: Key.alternateSnapModifier)
+            guard let modifier,
+                  modifier != snapModifier,
+                  modifier != spanModifier
+            else {
+                return nil
+            }
+
+            return modifier
+        }
+        set {
+            guard let newValue,
+                  newValue != snapModifier,
+                  newValue != spanModifier
+            else {
+                defaults.removeObject(forKey: Key.alternateSnapModifier)
+                return
+            }
+
+            defaults.set(newValue.rawValue, forKey: Key.alternateSnapModifier)
+            if rawOptionalModifier(for: Key.alternateSpanModifier) == newValue {
+                defaults.removeObject(forKey: Key.alternateSpanModifier)
+            }
         }
     }
 
@@ -547,6 +590,35 @@ public final class SettingsStore {
                 ? Self.fallbackSpanModifier(for: snapModifier)
                 : newValue
             defaults.set(sanitizedValue.rawValue, forKey: Key.spanModifier)
+            sanitizeOptionalModifiers()
+        }
+    }
+
+    public var alternateSpanModifier: SnapModifier? {
+        get {
+            let modifier = rawOptionalModifier(for: Key.alternateSpanModifier)
+            guard let modifier,
+                  modifier != spanModifier,
+                  modifier != snapModifier
+            else {
+                return nil
+            }
+
+            return modifier
+        }
+        set {
+            guard let newValue,
+                  newValue != spanModifier,
+                  newValue != snapModifier
+            else {
+                defaults.removeObject(forKey: Key.alternateSpanModifier)
+                return
+            }
+
+            defaults.set(newValue.rawValue, forKey: Key.alternateSpanModifier)
+            if rawOptionalModifier(for: Key.alternateSnapModifier) == newValue {
+                defaults.removeObject(forKey: Key.alternateSnapModifier)
+            }
         }
     }
 
@@ -611,6 +683,24 @@ public final class SettingsStore {
         }
 
         return .option
+    }
+
+    private func sanitizeOptionalModifiers() {
+        if let alternateSnap = rawOptionalModifier(for: Key.alternateSnapModifier),
+           alternateSnap == snapModifier || alternateSnap == spanModifier {
+            defaults.removeObject(forKey: Key.alternateSnapModifier)
+        }
+
+        if let alternateSpan = rawOptionalModifier(for: Key.alternateSpanModifier),
+           alternateSpan == spanModifier || alternateSpan == snapModifier {
+            defaults.removeObject(forKey: Key.alternateSpanModifier)
+        }
+
+        if let alternateSnap = rawOptionalModifier(for: Key.alternateSnapModifier),
+           let alternateSpan = rawOptionalModifier(for: Key.alternateSpanModifier),
+           alternateSnap == alternateSpan {
+            defaults.removeObject(forKey: Key.alternateSpanModifier)
+        }
     }
 
     private func ensureProfilesExist() {
@@ -747,6 +837,14 @@ public final class SettingsStore {
         }
 
         return defaults.bool(forKey: key)
+    }
+
+    private func rawOptionalModifier(for key: String) -> SnapModifier? {
+        guard let rawValue = defaults.string(forKey: key) else {
+            return nil
+        }
+
+        return SnapModifier(rawValue: rawValue)
     }
 
     private func clamp(_ value: Int, to range: ClosedRange<Int>) -> Int {

@@ -14,6 +14,7 @@ struct MacSnapGeometryCheck {
         checkSettingsGapFeedsModel()
         checkModelClampsInvalidSettingsAndCells()
         checkProfileStorageAndSwitching()
+        checkOptionalModifierStorage()
 
         print("MacSnapGeometryCheck: all checks passed.")
     }
@@ -156,6 +157,36 @@ struct MacSnapGeometryCheck {
         expect(store.rows == 3)
         store.activeProfileID = secondProfile.id
         expect(store.rows == 1)
+    }
+
+    private static func checkOptionalModifierStorage() {
+        let suiteName = "MacSnapGeometryCheck-\(UUID().uuidString)"
+        guard let defaults = UserDefaults(suiteName: suiteName) else {
+            fatalError("Could not create isolated UserDefaults suite")
+        }
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        expect(store.alternateSnapModifier == nil)
+        expect(store.alternateSpanModifier == nil)
+
+        store.alternateSnapModifier = .control
+        store.alternateSpanModifier = .option
+        expect(store.settings.alternateSnapModifier == .control)
+        expect(store.settings.alternateSpanModifier == .option)
+
+        store.alternateSnapModifier = .shift
+        expect(store.alternateSnapModifier == nil)
+
+        store.alternateSpanModifier = .middleClick
+        expect(store.alternateSpanModifier == nil)
+
+        store.alternateSnapModifier = .rightClick
+        store.alternateSpanModifier = .rightClick
+        expect(store.alternateSnapModifier == nil)
+        expect(store.alternateSpanModifier == .rightClick)
     }
 
     private static func expect(_ condition: @autoclosure () -> Bool, file: StaticString = #file, line: UInt = #line) {

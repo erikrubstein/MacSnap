@@ -36,8 +36,8 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         lastKnownActiveProfileID = settingsStore.activeProfileID
         settingsWindowController = SettingsWindowController(
             store: settingsStore,
-            onSettingsChanged: { [weak self] _, shouldFlashGrid in
-                self?.handleSettingsChanged(shouldFlashGrid: shouldFlashGrid)
+            onSettingsChanged: { [weak self] _, previewIntent in
+                self?.handleSettingsChanged(previewIntent: previewIntent)
             },
             onShortcutRecordingChanged: { [weak self] isRecording in
                 self?.setProfileHotkeysSuspended(isRecording)
@@ -125,7 +125,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         }
     }
 
-    private func handleSettingsChanged(shouldFlashGrid: Bool) {
+    private func handleSettingsChanged(previewIntent: SettingsWindowController.PreviewIntent) {
         let activeProfileID = settingsStore.activeProfileID
         let didSwitchProfile = lastKnownActiveProfileID != nil
             && lastKnownActiveProfileID != activeProfileID
@@ -134,10 +134,13 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         refreshMenuState()
         configureProfileHotkeys()
 
-        if shouldFlashGrid {
+        switch previewIntent {
+        case .sampleCell:
             flashGridLayout(selection: .sampleCell)
-        } else if didSwitchProfile {
+        case .profileSwitch where didSwitchProfile:
             flashGridLayout(selection: .none)
+        case .profileSwitch, .none:
+            break
         }
     }
 

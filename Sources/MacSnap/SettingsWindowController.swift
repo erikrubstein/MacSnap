@@ -3,6 +3,12 @@ import MacSnapCore
 
 @MainActor
 final class SettingsWindowController: NSWindowController, NSTableViewDataSource, NSTableViewDelegate {
+    enum PreviewIntent {
+        case none
+        case sampleCell
+        case profileSwitch
+    }
+
     private enum Column {
         static let active = NSUserInterfaceItemIdentifier("active")
         static let name = NSUserInterfaceItemIdentifier("name")
@@ -12,16 +18,17 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     }
 
     private let store: SettingsStore
-    private let onSettingsChanged: (GridSettings, Bool) -> Void
+    private let onSettingsChanged: (GridSettings, PreviewIntent) -> Void
     private let onShortcutRecordingChanged: (Bool) -> Void
+    private let profilePasteboardType = NSPasteboard.PasteboardType("com.erik.macsnap.profile")
 
     private let profilesTableView = NSTableView()
     private let editProfileButton = NSButton(title: "Edit", target: nil, action: nil)
     private let deleteProfileButton = NSButton(title: "Delete", target: nil, action: nil)
-    private let moveProfileUpButton = NSButton(title: "Up", target: nil, action: nil)
-    private let moveProfileDownButton = NSButton(title: "Down", target: nil, action: nil)
     private let snapModifierPopup = NSPopUpButton()
+    private let alternateSnapModifierPopup = NSPopUpButton()
     private let spanModifierPopup = NSPopUpButton()
+    private let alternateSpanModifierPopup = NSPopUpButton()
     private let visibleFrameSwitch = NSSwitch()
     private let restoreSizeSwitch = NSSwitch()
     private let backgroundColorWell = NSColorWell()
@@ -35,7 +42,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
     init(
         store: SettingsStore,
-        onSettingsChanged: @escaping (GridSettings, Bool) -> Void,
+        onSettingsChanged: @escaping (GridSettings, PreviewIntent) -> Void,
         onShortcutRecordingChanged: @escaping (Bool) -> Void
     ) {
         self.store = store
@@ -43,7 +50,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         self.onShortcutRecordingChanged = onShortcutRecordingChanged
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 760, height: 690),
+            contentRect: NSRect(x: 0, y: 0, width: 760, height: 750),
             styleMask: [.titled, .closable, .miniaturizable],
             backing: .buffered,
             defer: false
@@ -87,7 +94,9 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             title: "Global",
             rows: [
                 makeModifierRow(),
+                makeAlternateSnapModifierRow(),
                 makeSpanModifierRow(),
+                makeAlternateSpanModifierRow(),
                 makeVisibleFrameRow(),
                 makeRestoreSizeRow()
             ]
@@ -165,14 +174,17 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         profilesTableView.rowHeight = 28
         profilesTableView.usesAlternatingRowBackgroundColors = true
         profilesTableView.allowsMultipleSelection = false
+        profilesTableView.action = #selector(profileClicked)
         profilesTableView.doubleAction = #selector(editProfileClicked)
         profilesTableView.target = self
+        profilesTableView.registerForDraggedTypes([profilePasteboardType])
+        profilesTableView.setDraggingSourceOperationMask(.move, forLocal: true)
 
         addColumn(id: Column.active, title: "", width: 34)
         addColumn(id: Column.name, title: "Name", width: 210)
         addColumn(id: Column.grid, title: "Grid", width: 120)
         addColumn(id: Column.gap, title: "Gap", width: 70)
-        addColumn(id: Column.shortcut, title: "Shortcut", width: 230)
+        addColumn(id: Column.shortcut, title: "Shortcut", width: 246)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -202,16 +214,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         editProfileButton.action = #selector(editProfileClicked)
         deleteProfileButton.target = self
         deleteProfileButton.action = #selector(deleteProfileClicked)
-        moveProfileUpButton.target = self
-        moveProfileUpButton.action = #selector(moveProfileUpClicked)
-        moveProfileDownButton.target = self
-        moveProfileDownButton.action = #selector(moveProfileDownClicked)
 
         row.addArrangedSubview(addButton)
         row.addArrangedSubview(editProfileButton)
         row.addArrangedSubview(deleteProfileButton)
-        row.addArrangedSubview(moveProfileUpButton)
-        row.addArrangedSubview(moveProfileDownButton)
 
         return row
     }
@@ -236,6 +242,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         return row
     }
 
+    private var optionalModifierTitles: [String] {
+        ["None"] + SnapModifier.allCases.map(\.displayName)
+    }
+
     private func makeModifierRow() -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
@@ -257,6 +267,27 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         return row
     }
 
+    private func makeAlternateSnapModifierRow() -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = NSTextField(labelWithString: "Alternate snap modifier")
+        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+
+        alternateSnapModifierPopup.removeAllItems()
+        alternateSnapModifierPopup.addItems(withTitles: optionalModifierTitles)
+        alternateSnapModifierPopup.target = self
+        alternateSnapModifierPopup.action = #selector(alternateSnapModifierChanged)
+        alternateSnapModifierPopup.widthAnchor.constraint(equalToConstant: 160).isActive = true
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(alternateSnapModifierPopup)
+
+        return row
+    }
+
     private func makeSpanModifierRow() -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
@@ -274,6 +305,27 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
         row.addArrangedSubview(labelView)
         row.addArrangedSubview(spanModifierPopup)
+
+        return row
+    }
+
+    private func makeAlternateSpanModifierRow() -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = NSTextField(labelWithString: "Alternate span modifier")
+        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+
+        alternateSpanModifierPopup.removeAllItems()
+        alternateSpanModifierPopup.addItems(withTitles: optionalModifierTitles)
+        alternateSpanModifierPopup.target = self
+        alternateSpanModifierPopup.action = #selector(alternateSpanModifierChanged)
+        alternateSpanModifierPopup.widthAnchor.constraint(equalToConstant: 160).isActive = true
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(alternateSpanModifierPopup)
 
         return row
     }
@@ -358,14 +410,13 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         if let row = store.profiles.firstIndex(where: { $0.id == activeProfile.id }) {
             profilesTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
         }
-        let selectedRow = profilesTableView.selectedRow
 
         editProfileButton.isEnabled = selectedProfile != nil
         deleteProfileButton.isEnabled = store.profiles.count > 1 && selectedProfile != nil
-        moveProfileUpButton.isEnabled = selectedRow > 0
-        moveProfileDownButton.isEnabled = selectedRow >= 0 && selectedRow < store.profiles.count - 1
         snapModifierPopup.selectItem(withTitle: settings.snapModifier.displayName)
+        alternateSnapModifierPopup.selectItem(withTitle: settings.alternateSnapModifier?.displayName ?? "None")
         spanModifierPopup.selectItem(withTitle: settings.spanModifier.displayName)
+        alternateSpanModifierPopup.selectItem(withTitle: settings.alternateSpanModifier?.displayName ?? "None")
         visibleFrameSwitch.state = settings.useVisibleFrame ? .on : .off
         restoreSizeSwitch.state = settings.restoreSizeOnUnsnap ? .on : .off
         backgroundColorWell.color = NSColor(gridColor: settings.appearance.backgroundColor)
@@ -430,23 +481,32 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             return
         }
 
-        guard let selectedProfile else {
+        guard selectedProfile != nil else {
             editProfileButton.isEnabled = false
             deleteProfileButton.isEnabled = false
-            moveProfileUpButton.isEnabled = false
-            moveProfileDownButton.isEnabled = false
+            return
+        }
+
+        editProfileButton.isEnabled = true
+        deleteProfileButton.isEnabled = store.profiles.count > 1
+    }
+
+    @objc private func profileClicked() {
+        guard let selectedProfile,
+              selectedProfile.id != store.activeProfileID
+        else {
             return
         }
 
         store.activeProfileID = selectedProfile.id
         refresh()
-        onSettingsChanged(store.settings, false)
+        onSettingsChanged(store.settings, .profileSwitch)
     }
 
     @objc private func addProfileClicked() {
         let profile = store.addProfile()
         refresh()
-        onSettingsChanged(store.settings, false)
+        onSettingsChanged(store.settings, .none)
         showEditor(for: profile)
     }
 
@@ -465,25 +525,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
         store.deleteProfile(id: selectedProfile.id)
         refresh()
-        onSettingsChanged(store.settings, false)
-    }
-
-    @objc private func moveProfileUpClicked() {
-        moveSelectedProfile(by: -1)
-    }
-
-    @objc private func moveProfileDownClicked() {
-        moveSelectedProfile(by: 1)
-    }
-
-    private func moveSelectedProfile(by offset: Int) {
-        guard let selectedProfile else {
-            return
-        }
-
-        store.moveProfile(id: selectedProfile.id, by: offset)
-        refresh()
-        onSettingsChanged(store.settings, false)
+        onSettingsChanged(store.settings, .profileSwitch)
     }
 
     private func showEditor(for profile: GridProfile) {
@@ -501,7 +543,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             store.updateProfile(updatedProfile)
             store.activeProfileID = updatedProfile.id
             refresh()
-            onSettingsChanged(store.settings, false)
+            onSettingsChanged(store.settings, .profileSwitch)
         }
 
         profileEditorWindowController = editor
@@ -530,7 +572,21 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
 
         refresh()
-        onSettingsChanged(store.settings, false)
+        onSettingsChanged(store.settings, .none)
+    }
+
+    private func optionalModifier(from popup: NSPopUpButton) -> SnapModifier? {
+        let selectedIndex = popup.indexOfSelectedItem
+        guard selectedIndex > 0 else {
+            return nil
+        }
+
+        let modifierIndex = selectedIndex - 1
+        guard SnapModifier.allCases.indices.contains(modifierIndex) else {
+            return nil
+        }
+
+        return SnapModifier.allCases[modifierIndex]
     }
 
     @objc private func snapModifierChanged() {
@@ -542,6 +598,12 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         saveGlobal(snapModifier: SnapModifier.allCases[selectedIndex])
     }
 
+    @objc private func alternateSnapModifierChanged() {
+        store.alternateSnapModifier = optionalModifier(from: alternateSnapModifierPopup)
+        refresh()
+        onSettingsChanged(store.settings, .none)
+    }
+
     @objc private func spanModifierChanged() {
         let selectedIndex = spanModifierPopup.indexOfSelectedItem
         guard SnapModifier.allCases.indices.contains(selectedIndex) else {
@@ -549,6 +611,12 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
 
         saveGlobal(spanModifier: SnapModifier.allCases[selectedIndex])
+    }
+
+    @objc private func alternateSpanModifierChanged() {
+        store.alternateSpanModifier = optionalModifier(from: alternateSpanModifierPopup)
+        refresh()
+        onSettingsChanged(store.settings, .none)
     }
 
     @objc private func visibleFrameSwitchChanged(_ sender: NSSwitch) {
@@ -567,7 +635,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             selectionColor: selectionColorWell.color.gridColor
         )
         refresh()
-        onSettingsChanged(store.settings, true)
+        onSettingsChanged(store.settings, .sampleCell)
     }
 
     @objc private func refreshButtonClicked() {
@@ -581,7 +649,81 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     @objc private func resetClicked() {
         store.reset()
         refresh()
-        onSettingsChanged(store.settings, false)
+        onSettingsChanged(store.settings, .none)
+    }
+
+    func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {
+        guard tableView == profilesTableView,
+              store.profiles.indices.contains(row)
+        else {
+            return nil
+        }
+
+        let item = NSPasteboardItem()
+        item.setString(store.profiles[row].id.uuidString, forType: profilePasteboardType)
+        return item
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        validateDrop info: NSDraggingInfo,
+        proposedRow row: Int,
+        proposedDropOperation dropOperation: NSTableView.DropOperation
+    ) -> NSDragOperation {
+        guard tableView == profilesTableView,
+              info.draggingPasteboard.string(forType: profilePasteboardType) != nil
+        else {
+            return []
+        }
+
+        let dropRow = min(max(row, 0), store.profiles.count)
+        tableView.setDropRow(dropRow, dropOperation: .above)
+        return .move
+    }
+
+    func tableView(
+        _ tableView: NSTableView,
+        acceptDrop info: NSDraggingInfo,
+        row: Int,
+        dropOperation: NSTableView.DropOperation
+    ) -> Bool {
+        guard tableView == profilesTableView,
+              let rawProfileID = info.draggingPasteboard.string(forType: profilePasteboardType),
+              let profileID = UUID(uuidString: rawProfileID)
+        else {
+            return false
+        }
+
+        return moveProfile(id: profileID, toDropRow: row)
+    }
+
+    private func moveProfile(id: UUID, toDropRow row: Int) -> Bool {
+        var profiles = store.profiles
+        guard let sourceIndex = profiles.firstIndex(where: { $0.id == id }) else {
+            return false
+        }
+
+        let profile = profiles.remove(at: sourceIndex)
+        var destinationIndex = row
+        if row > sourceIndex {
+            destinationIndex -= 1
+        }
+        destinationIndex = min(max(destinationIndex, 0), profiles.count)
+
+        guard destinationIndex != sourceIndex else {
+            return false
+        }
+
+        profiles.insert(profile, at: destinationIndex)
+        store.profiles = profiles
+        refresh()
+
+        isRefreshing = true
+        profilesTableView.selectRowIndexes(IndexSet(integer: destinationIndex), byExtendingSelection: false)
+        isRefreshing = false
+
+        onSettingsChanged(store.settings, .none)
+        return true
     }
 }
 

@@ -7,6 +7,13 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     private let profilesProvider: () -> [GridProfile]
     private let onShortcutRecordingChanged: (Bool) -> Void
     private let onSave: (GridProfile) -> Void
+    private let labelWidth: CGFloat = 90
+    private let controlSpacing: CGFloat = 12
+    private let sliderWidth: CGFloat = 220
+    private let valueLabelWidth: CGFloat = 32
+    private let textFieldWidth: CGFloat = 250
+    private let buttonRowWidth: CGFloat = 392
+    private let rowHeight: CGFloat = 28
 
     private let nameField = NSTextField()
     private let rowsSlider = NSSlider()
@@ -61,6 +68,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         stack.addArrangedSubview(makeSliderRow(label: "Columns", slider: columnsSlider, valueLabel: columnsValueLabel, min: 1, max: 12))
         stack.addArrangedSubview(makeSliderRow(label: "Gap", slider: gapSlider, valueLabel: gapValueLabel, min: 0, max: 80))
         stack.addArrangedSubview(makeShortcutRow())
+        stack.setCustomSpacing(24, after: stack.arrangedSubviews.last!)
         stack.addArrangedSubview(makeButtonRow())
 
         container.addSubview(stack)
@@ -79,13 +87,15 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
+        row.spacing = controlSpacing
+        row.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
 
         let labelView = NSTextField(labelWithString: label)
-        labelView.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        labelView.widthAnchor.constraint(equalToConstant: labelWidth).isActive = true
 
         field.delegate = self
-        field.widthAnchor.constraint(equalToConstant: 250).isActive = true
+        field.widthAnchor.constraint(equalToConstant: textFieldWidth).isActive = true
+        field.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
 
         row.addArrangedSubview(labelView)
         row.addArrangedSubview(field)
@@ -103,10 +113,11 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
+        row.spacing = controlSpacing
+        row.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
 
         let labelView = NSTextField(labelWithString: label)
-        labelView.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        labelView.widthAnchor.constraint(equalToConstant: labelWidth).isActive = true
 
         slider.minValue = Double(min)
         slider.maxValue = Double(max)
@@ -116,10 +127,10 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         }
         slider.target = self
         slider.action = #selector(sliderChanged(_:))
-        slider.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        slider.widthAnchor.constraint(equalToConstant: sliderWidth).isActive = true
 
         valueLabel.alignment = .right
-        valueLabel.widthAnchor.constraint(equalToConstant: 32).isActive = true
+        valueLabel.widthAnchor.constraint(equalToConstant: valueLabelWidth).isActive = true
 
         row.addArrangedSubview(labelView)
         row.addArrangedSubview(slider)
@@ -132,12 +143,13 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
-        row.spacing = 12
+        row.spacing = controlSpacing
+        row.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
 
         let labelView = NSTextField(labelWithString: "Shortcut")
-        labelView.widthAnchor.constraint(equalToConstant: 90).isActive = true
+        labelView.widthAnchor.constraint(equalToConstant: labelWidth).isActive = true
 
-        shortcutField.widthAnchor.constraint(equalToConstant: 220).isActive = true
+        shortcutField.widthAnchor.constraint(equalToConstant: sliderWidth).isActive = true
         shortcutField.onShortcutRecorded = { [weak self] shortcut in
             self?.handleRecordedShortcut(shortcut)
         }
@@ -168,7 +180,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         row.addArrangedSubview(spacer)
         row.addArrangedSubview(cancelButton)
         row.addArrangedSubview(saveButton)
-        row.widthAnchor.constraint(equalToConstant: 392).isActive = true
+        row.widthAnchor.constraint(equalToConstant: buttonRowWidth).isActive = true
 
         return row
     }

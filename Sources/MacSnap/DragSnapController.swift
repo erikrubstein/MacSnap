@@ -99,7 +99,7 @@ final class DragSnapController {
 
     private func handleMouseDragged() {
         let settings = settingsStore.settings
-        guard isTriggerPressed(settings.snapModifier) else {
+        guard isSnapTriggerPressed(settings) else {
             restoreSizeOnUnsnapIfNeeded(settings: settings)
             hideActiveOverlay()
             return
@@ -150,11 +150,12 @@ final class DragSnapController {
         }
 
         let selection: GridSelection
-        if isTriggerPressed(settings.spanModifier) || spanAnchorCell != nil {
+        if isSpanTriggerPressed(settings) {
             let anchor = spanAnchorCell ?? lastHoveredCell ?? cell
             spanAnchorCell = anchor
             selection = model.selection(from: anchor, to: cell)
         } else {
+            spanAnchorCell = nil
             selection = GridSelection(cell: cell)
         }
 
@@ -178,7 +179,7 @@ final class DragSnapController {
 
         let settings = settingsStore.settings
         guard isSnapModeActive,
-              isTriggerPressed(settings.snapModifier),
+              isSnapTriggerPressed(settings),
               let candidateWindow,
               let activeScreen,
               let activeSelection
@@ -202,7 +203,7 @@ final class DragSnapController {
 
     private func handleTriggerChanged() {
         let settings = settingsStore.settings
-        let snapTriggerIsPressed = isTriggerPressed(settings.snapModifier)
+        let snapTriggerIsPressed = isSnapTriggerPressed(settings)
 
         guard isSnapModeActive else {
             if snapTriggerIsPressed, isLeftButtonPressed {
@@ -216,7 +217,7 @@ final class DragSnapController {
             return
         }
 
-        if isTriggerPressed(settings.spanModifier), isLeftButtonPressed {
+        if isLeftButtonPressed {
             handleMouseDragged()
         }
     }
@@ -283,6 +284,22 @@ final class DragSnapController {
                 .intersection(.deviceIndependentFlagsMask)
                 .contains(modifier.eventFlag)
         }
+    }
+
+    private func isTriggerPressed(_ modifier: SnapModifier?) -> Bool {
+        guard let modifier else {
+            return false
+        }
+
+        return isTriggerPressed(modifier)
+    }
+
+    private func isSnapTriggerPressed(_ settings: GridSettings) -> Bool {
+        isTriggerPressed(settings.snapModifier) || isTriggerPressed(settings.alternateSnapModifier)
+    }
+
+    private func isSpanTriggerPressed(_ settings: GridSettings) -> Bool {
+        isTriggerPressed(settings.spanModifier) || isTriggerPressed(settings.alternateSpanModifier)
     }
 
     private func screenFrame(for screen: NSScreen, settings: GridSettings) -> CGRect {
