@@ -41,16 +41,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          branch="appcast"
-          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
-            base_sha="$(git rev-parse HEAD)"
-            gh api \
-              --method POST \
-              "repos/${GITHUB_REPOSITORY}/git/refs" \
-              -f ref="refs/heads/${branch}" \
-              -f sha="$base_sha"
-          fi
-
+          branch="main"
           content="$(base64 -i dist/appcast.xml | tr -d '\n')"
           existing_sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/appcast.xml?ref=${branch}" --jq .sha 2>/dev/null || true)"
           args=(

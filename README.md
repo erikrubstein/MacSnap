@@ -51,7 +51,7 @@ git push origin v0.1.0
 Tagged releases also publish `appcast.xml` for Sparkle updates at:
 
 ```text
-https://raw.githubusercontent.com/erikrubstein/MacSnap/appcast/appcast.xml
+https://raw.githubusercontent.com/erikrubstein/MacSnap/main/appcast.xml
 ```
 
 The release workflow requires a GitHub Actions secret named `SPARKLE_PRIVATE_KEY`.
