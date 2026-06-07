@@ -6,6 +6,7 @@ PRODUCT_NAME="MacSnap"
 BUNDLE_ID="${BUNDLE_ID:-com.erik.macsnap}"
 MINIMUM_SYSTEM_VERSION="${MINIMUM_SYSTEM_VERSION:-13.0}"
 ARCHS="${ARCHS:-arm64 x86_64}"
+CODE_SIGN_IDENTITY="${CODE_SIGN_IDENTITY:--}"
 
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$ROOT_DIR"
@@ -115,7 +116,8 @@ copy_dmg_background() {
 }
 
 sign_app_bundle() {
-  codesign --force --deep --sign - "$APP_BUNDLE"
+  echo "Signing $APP_NAME.app with identity: $CODE_SIGN_IDENTITY"
+  codesign --force --deep --sign "$CODE_SIGN_IDENTITY" "$APP_BUNDLE"
   codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
 }
 
@@ -129,6 +131,7 @@ set_dmg_finder_layout() {
     SetFile -a V "$mounted_volume/.fseventsd" 2>/dev/null || chflags hidden "$mounted_volume/.fseventsd" 2>/dev/null || true
   fi
   cp "$APP_ICON" "$mounted_volume/.VolumeIcon.icns"
+  SetFile -a V "$mounted_volume/.VolumeIcon.icns" 2>/dev/null || chflags hidden "$mounted_volume/.VolumeIcon.icns" 2>/dev/null || true
   SetFile -a C "$mounted_volume" 2>/dev/null || true
 
   osascript <<APPLESCRIPT
@@ -148,20 +151,8 @@ tell application "Finder"
   set text size of viewOptions to 13
   set background color of viewOptions to {63222, 63222, 63222}
   set background picture of viewOptions to (POSIX file "$mounted_volume/.background/background.png")
-  try
-    set position of item ".background" of dmgWindow to {80, 80}
-  end try
-  try
-    set position of item ".fseventsd" of dmgWindow to {80, 150}
-  end try
-  try
-    set position of item ".VolumeIcon.icns" of dmgWindow to {80, 220}
-  end try
-  try
-    set position of item ".DS_Store" of dmgWindow to {80, 150}
-  end try
   set position of item "$APP_NAME.app" of dmgWindow to {155, 220}
-  set position of item "Applications" of dmgWindow to {515, 220}
+  set position of item "Applications" of dmgWindow to {575, 220}
   update targetFolder
   delay 3
   close dmgWindow
@@ -177,7 +168,7 @@ APPLESCRIPT
 hide_dmg_helper_items() {
   local mounted_volume="$1"
 
-  for helper_item in ".DS_Store" ".background" ".fseventsd"; do
+  for helper_item in ".DS_Store" ".VolumeIcon.icns" ".background" ".fseventsd"; do
     if [[ -e "$mounted_volume/$helper_item" ]]; then
       SetFile -a V "$mounted_volume/$helper_item" 2>/dev/null || chflags hidden "$mounted_volume/$helper_item" 2>/dev/null || true
     fi

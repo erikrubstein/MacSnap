@@ -169,4 +169,21 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertNil(store.alternateSnapModifier)
         XCTAssertEqual(store.alternateSpanModifier, .rightClick)
     }
+
+    func testLaunchAtLoginDefaultsOnAndResetsOn() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.launchAtLogin)
+
+        store.launchAtLogin = false
+        XCTAssertFalse(store.launchAtLogin)
+
+        store.reset()
+        XCTAssertTrue(store.launchAtLogin)
+    }
 }

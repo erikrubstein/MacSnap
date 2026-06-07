@@ -37,6 +37,7 @@ Open `Settings...` from the menu bar item to configure:
 - profile shortcuts
 - overlay colors
 - screen frame behavior
+- launch at login
 
 ## Update
 

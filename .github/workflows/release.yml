@@ -60,9 +60,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: MacSnap-release-assets
-          path: |
-            dist/*.dmg
-            dist/appcast.xml
+          path: dist/*.dmg
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -72,7 +70,7 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/*.dmg dist/appcast.xml --clobber
+            gh release upload "$tag" dist/*.dmg --clobber
           else
-            gh release create "$tag" dist/*.dmg dist/appcast.xml --title "MacSnap $tag" --generate-notes
+            gh release create "$tag" dist/*.dmg --title "MacSnap $tag" --generate-notes
           fi

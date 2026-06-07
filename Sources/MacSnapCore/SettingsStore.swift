@@ -292,6 +292,7 @@ public final class SettingsStore {
         static let alternateSpanModifier = "alternateSpanModifier"
         static let useVisibleFrame = "useVisibleFrame"
         static let restoreSizeOnUnsnap = "restoreSizeOnUnsnap"
+        static let launchAtLogin = "launchAtLogin"
         static let gridAppearance = "gridAppearance"
     }
 
@@ -640,6 +641,15 @@ public final class SettingsStore {
         }
     }
 
+    public var launchAtLogin: Bool {
+        get {
+            boolValue(for: Key.launchAtLogin, fallback: true)
+        }
+        set {
+            defaults.set(newValue, forKey: Key.launchAtLogin)
+        }
+    }
+
     public var appearance: GridAppearance {
         get {
             guard let data = defaults.data(forKey: Key.gridAppearance),
@@ -659,6 +669,7 @@ public final class SettingsStore {
         profiles = [Self.defaultProfile]
         activeProfileID = Self.defaultProfile.id
         settings = Self.defaultSettings
+        launchAtLogin = true
     }
 
     private func ensureDefaults() {
@@ -669,7 +680,8 @@ public final class SettingsStore {
             Key.snapModifier: Self.defaultSettings.snapModifier.rawValue,
             Key.spanModifier: Self.defaultSettings.spanModifier.rawValue,
             Key.useVisibleFrame: Self.defaultSettings.useVisibleFrame,
-            Key.restoreSizeOnUnsnap: Self.defaultSettings.restoreSizeOnUnsnap
+            Key.restoreSizeOnUnsnap: Self.defaultSettings.restoreSizeOnUnsnap,
+            Key.launchAtLogin: true
         ])
         if defaults.data(forKey: Key.gridAppearance) == nil {
             saveAppearance(Self.defaultSettings.appearance)

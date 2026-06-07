@@ -35,11 +35,15 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarItem()
         requestAccessibilityPermission()
+        LaunchAtLoginController.setEnabled(settingsStore.launchAtLogin)
         lastKnownActiveProfileID = settingsStore.activeProfileID
         settingsWindowController = SettingsWindowController(
             store: settingsStore,
             onSettingsChanged: { [weak self] _, previewIntent in
                 self?.handleSettingsChanged(previewIntent: previewIntent)
+            },
+            onLaunchAtLoginChanged: { enabled in
+                LaunchAtLoginController.setEnabled(enabled)
             },
             onShortcutRecordingChanged: { [weak self] isRecording in
                 self?.setProfileHotkeysSuspended(isRecording)

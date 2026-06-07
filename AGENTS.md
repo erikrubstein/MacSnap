@@ -49,7 +49,8 @@ SPARKLE_PRIVATE_KEY="$(cat Packaging/MacSnap.sparkle.private-key)" Packaging/gen
 ## Notes
 
 - Do not commit `Packaging/*.private-key`.
-- The DMG build script ad-hoc signs the app bundle for local distribution.
+- The DMG build script ad-hoc signs the app bundle by default. Pass `CODE_SIGN_IDENTITY="Developer ID Application: ..."` to use a stable signing identity.
+- Ad-hoc signed updates can lose macOS Accessibility trust because TCC may no longer match the updated app's code identity. Stable code signing is needed for seamless permission preservation across updates.
 - The app is not Developer ID signed or notarized yet.
 - Keep `appcast.xml` on `main`; the release workflow updates it for tagged releases.
 - Prefer small, focused changes and keep README user-facing rather than roadmap-heavy.

@@ -19,6 +19,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
     private let store: SettingsStore
     private let onSettingsChanged: (GridSettings, PreviewIntent) -> Void
+    private let onLaunchAtLoginChanged: (Bool) -> Void
     private let onShortcutRecordingChanged: (Bool) -> Void
     private let profilePasteboardType = NSPasteboard.PasteboardType("com.erik.macsnap.profile")
 
@@ -29,6 +30,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private let alternateSnapModifierPopup = NSPopUpButton()
     private let spanModifierPopup = NSPopUpButton()
     private let alternateSpanModifierPopup = NSPopUpButton()
+    private let launchAtLoginSwitch = NSSwitch()
     private let visibleFrameSwitch = NSSwitch()
     private let restoreSizeSwitch = NSSwitch()
     private let backgroundColorWell = NSColorWell()
@@ -43,10 +45,12 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     init(
         store: SettingsStore,
         onSettingsChanged: @escaping (GridSettings, PreviewIntent) -> Void,
+        onLaunchAtLoginChanged: @escaping (Bool) -> Void,
         onShortcutRecordingChanged: @escaping (Bool) -> Void
     ) {
         self.store = store
         self.onSettingsChanged = onSettingsChanged
+        self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
         self.onShortcutRecordingChanged = onShortcutRecordingChanged
 
         let window = NSWindow(
@@ -97,6 +101,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
                 makeAlternateSnapModifierRow(),
                 makeSpanModifierRow(),
                 makeAlternateSpanModifierRow(),
+                makeLaunchAtLoginRow(),
                 makeVisibleFrameRow(),
                 makeRestoreSizeRow()
             ]
@@ -348,6 +353,24 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         return row
     }
 
+    private func makeLaunchAtLoginRow() -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = NSTextField(labelWithString: "Launch at login")
+        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+
+        launchAtLoginSwitch.target = self
+        launchAtLoginSwitch.action = #selector(launchAtLoginSwitchChanged(_:))
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(launchAtLoginSwitch)
+
+        return row
+    }
+
     private func makeRestoreSizeRow() -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
@@ -369,18 +392,28 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private func makePermissionRow() -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
-        row.alignment = .centerY
+        row.alignment = .top
         row.spacing = 12
 
         let labelView = NSTextField(labelWithString: "MacSnap needs Accessibility permission before snapping can work.")
-        labelView.widthAnchor.constraint(equalToConstant: 380).isActive = true
+        labelView.lineBreakMode = .byWordWrapping
+        labelView.maximumNumberOfLines = 0
+        labelView.setContentCompressionResistancePriority(.defaultLow, for: .horizontal)
+        labelView.setContentHuggingPriority(.defaultLow, for: .horizontal)
 
         let openButton = NSButton(title: "Open Settings", target: self, action: #selector(openAccessibilitySettings))
         let refreshButton = NSButton(title: "Refresh", target: self, action: #selector(refreshButtonClicked))
 
+        let buttonRow = NSStackView()
+        buttonRow.orientation = .horizontal
+        buttonRow.alignment = .centerY
+        buttonRow.spacing = 8
+        buttonRow.setContentCompressionResistancePriority(.required, for: .horizontal)
+        buttonRow.addArrangedSubview(openButton)
+        buttonRow.addArrangedSubview(refreshButton)
+
         row.addArrangedSubview(labelView)
-        row.addArrangedSubview(openButton)
-        row.addArrangedSubview(refreshButton)
+        row.addArrangedSubview(buttonRow)
 
         return row
     }
@@ -417,6 +450,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         alternateSnapModifierPopup.selectItem(withTitle: settings.alternateSnapModifier?.displayName ?? "None")
         spanModifierPopup.selectItem(withTitle: settings.spanModifier.displayName)
         alternateSpanModifierPopup.selectItem(withTitle: settings.alternateSpanModifier?.displayName ?? "None")
+        launchAtLoginSwitch.state = store.launchAtLogin ? .on : .off
         visibleFrameSwitch.state = settings.useVisibleFrame ? .on : .off
         restoreSizeSwitch.state = settings.restoreSizeOnUnsnap ? .on : .off
         backgroundColorWell.color = NSColor(gridColor: settings.appearance.backgroundColor)
@@ -623,6 +657,13 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         saveGlobal(useVisibleFrame: sender.state == .on)
     }
 
+    @objc private func launchAtLoginSwitchChanged(_ sender: NSSwitch) {
+        let enabled = sender.state == .on
+        store.launchAtLogin = enabled
+        onLaunchAtLoginChanged(enabled)
+        refresh()
+    }
+
     @objc private func restoreSizeSwitchChanged(_ sender: NSSwitch) {
         saveGlobal(restoreSizeOnUnsnap: sender.state == .on)
     }
@@ -648,6 +689,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
     @objc private func resetClicked() {
         store.reset()
+        onLaunchAtLoginChanged(store.launchAtLogin)
         refresh()
         onSettingsChanged(store.settings, .none)
     }
