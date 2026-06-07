@@ -9,3 +9,6 @@
 
 # Local release artifacts
 dist/
+
+# Local Sparkle update signing secrets
+Packaging/*.private-key

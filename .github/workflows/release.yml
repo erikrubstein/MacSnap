@@ -24,14 +24,54 @@ jobs:
       - name: Run tests
         run: swift test
 
+      - name: Resolve package dependencies
+        run: swift package resolve
+
       - name: Build DMG
         run: Packaging/build_dmg.sh
+
+      - name: Generate Sparkle appcast
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          SPARKLE_PRIVATE_KEY: ${{ secrets.SPARKLE_PRIVATE_KEY }}
+        run: Packaging/generate_appcast.sh
+
+      - name: Publish Sparkle appcast feed
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          branch="appcast"
+          if ! gh api "repos/${GITHUB_REPOSITORY}/git/ref/heads/${branch}" >/dev/null 2>&1; then
+            base_sha="$(git rev-parse HEAD)"
+            gh api \
+              --method POST \
+              "repos/${GITHUB_REPOSITORY}/git/refs" \
+              -f ref="refs/heads/${branch}" \
+              -f sha="$base_sha"
+          fi
+
+          content="$(base64 -i dist/appcast.xml | tr -d '\n')"
+          existing_sha="$(gh api "repos/${GITHUB_REPOSITORY}/contents/appcast.xml?ref=${branch}" --jq .sha 2>/dev/null || true)"
+          args=(
+            --method PUT
+            "repos/${GITHUB_REPOSITORY}/contents/appcast.xml"
+            -f message="Update Sparkle appcast for ${GITHUB_REF_NAME}"
+            -f branch="${branch}"
+            -f content="${content}"
+          )
+          if [[ -n "$existing_sha" ]]; then
+            args+=(-f sha="$existing_sha")
+          fi
+          gh api "${args[@]}"
 
       - name: Upload DMG artifact
         uses: actions/upload-artifact@v4
         with:
-          name: MacSnap-dmg
-          path: dist/*.dmg
+          name: MacSnap-release-assets
+          path: |
+            dist/*.dmg
+            dist/appcast.xml
           if-no-files-found: error
 
       - name: Publish GitHub release
@@ -41,7 +81,7 @@ jobs:
         run: |
           tag="${GITHUB_REF_NAME}"
           if gh release view "$tag" >/dev/null 2>&1; then
-            gh release upload "$tag" dist/*.dmg --clobber
+            gh release upload "$tag" dist/*.dmg dist/appcast.xml --clobber
           else
-            gh release create "$tag" dist/*.dmg --title "MacSnap $tag" --generate-notes
+            gh release create "$tag" dist/*.dmg dist/appcast.xml --title "MacSnap $tag" --generate-notes
           fi

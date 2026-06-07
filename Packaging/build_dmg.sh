@@ -23,9 +23,14 @@ PACKAGE_DIR="$ROOT_DIR/.build/package"
 APP_BUNDLE="$PACKAGE_DIR/$APP_NAME.app"
 APP_CONTENTS="$APP_BUNDLE/Contents"
 APP_MACOS="$APP_CONTENTS/MacOS"
+APP_FRAMEWORKS="$APP_CONTENTS/Frameworks"
 APP_RESOURCES="$APP_CONTENTS/Resources"
 APP_ICON_SOURCE="$ROOT_DIR/Sources/MacSnap/Resources/MacSnapIcon.png"
+APP_COMPOSER_ICON_SOURCE="$ROOT_DIR/Sources/MacSnap/Resources/MacSnapIcon.icon"
 DMG_BACKGROUND_SOURCE="$ROOT_DIR/Packaging/DMGBackground.png"
+SPARKLE_FRAMEWORK_SOURCE="$ROOT_DIR/.build/artifacts/sparkle/Sparkle/Sparkle.xcframework/macos-arm64_x86_64/Sparkle.framework"
+SPARKLE_PUBLIC_ED_KEY="BEwwkfT+XIpnOjsUjaxnNDQuyBKXH1sq5IXAUJSKwlw="
+SPARKLE_FEED_URL="${SPARKLE_FEED_URL:-https://raw.githubusercontent.com/erikrubstein/MacSnap/appcast/appcast.xml}"
 APP_ICONSET="$PACKAGE_DIR/$APP_NAME.iconset"
 APP_ICON="$APP_RESOURCES/$APP_NAME.icns"
 DMG_STAGE="$PACKAGE_DIR/dmg"
@@ -34,7 +39,7 @@ RW_DMG_PATH="$PACKAGE_DIR/$APP_NAME-rw.dmg"
 DMG_PATH="$DIST_DIR/$APP_NAME-$APP_VERSION.dmg"
 
 rm -rf "$PACKAGE_DIR" "$DIST_DIR"
-mkdir -p "$APP_MACOS" "$APP_RESOURCES" "$DIST_DIR"
+mkdir -p "$APP_MACOS" "$APP_FRAMEWORKS" "$APP_RESOURCES" "$DIST_DIR"
 
 require_tool() {
   if ! command -v "$1" >/dev/null 2>&1; then
@@ -55,6 +60,13 @@ validate_icon_source() {
   fi
 }
 
+validate_composer_icon_source() {
+  if [[ ! -d "$APP_COMPOSER_ICON_SOURCE" ]]; then
+    echo "Expected Icon Composer package at $APP_COMPOSER_ICON_SOURCE" >&2
+    exit 1
+  fi
+}
+
 validate_dmg_background_source() {
   if [[ ! -s "$DMG_BACKGROUND_SOURCE" ]]; then
     echo "Expected non-empty DMG background PNG at $DMG_BACKGROUND_SOURCE" >&2
@@ -63,6 +75,14 @@ validate_dmg_background_source() {
 
   if ! sips -g pixelWidth -g pixelHeight "$DMG_BACKGROUND_SOURCE" >/dev/null 2>&1; then
     echo "DMG background source is not a valid PNG: $DMG_BACKGROUND_SOURCE" >&2
+    exit 1
+  fi
+}
+
+validate_sparkle_framework_source() {
+  if [[ ! -d "$SPARKLE_FRAMEWORK_SOURCE" ]]; then
+    echo "Expected Sparkle framework at $SPARKLE_FRAMEWORK_SOURCE" >&2
+    echo "Run 'swift package resolve' before packaging." >&2
     exit 1
   fi
 }
@@ -172,8 +192,11 @@ require_tool iconutil
 require_tool hdiutil
 require_tool osascript
 require_tool codesign
+require_tool install_name_tool
 validate_icon_source
+validate_composer_icon_source
 validate_dmg_background_source
+validate_sparkle_framework_source
 
 successful_archs=()
 for arch in $ARCHS; do
@@ -203,6 +226,7 @@ else
   lipo -create "${inputs[@]}" -output "$APP_MACOS/$APP_NAME"
 fi
 chmod +x "$APP_MACOS/$APP_NAME"
+install_name_tool -add_rpath "@loader_path/../Frameworks" "$APP_MACOS/$APP_NAME" 2>/dev/null || true
 
 resource_arch="${successful_archs[0]}"
 resource_bundle="$ROOT_DIR/.build/$resource_arch-apple-macosx/release/MacSnap_MacSnap.bundle"
@@ -212,6 +236,9 @@ else
   echo "Expected SwiftPM resource bundle not found at $resource_bundle" >&2
   exit 1
 fi
+
+cp -R "$APP_COMPOSER_ICON_SOURCE" "$APP_RESOURCES/"
+cp -R "$SPARKLE_FRAMEWORK_SOURCE" "$APP_FRAMEWORKS/"
 
 build_icns_from_png
 
@@ -229,6 +256,8 @@ cat > "$APP_CONTENTS/Info.plist" <<PLIST
   <string>$APP_NAME</string>
   <key>CFBundleIconFile</key>
   <string>$APP_NAME</string>
+  <key>CFBundleIconName</key>
+  <string>MacSnapIcon</string>
   <key>CFBundleIdentifier</key>
   <string>$BUNDLE_ID</string>
   <key>CFBundleInfoDictionaryVersion</key>
@@ -247,6 +276,12 @@ cat > "$APP_CONTENTS/Info.plist" <<PLIST
   <true/>
   <key>NSHighResolutionCapable</key>
   <true/>
+  <key>SUEnableAutomaticChecks</key>
+  <false/>
+  <key>SUFeedURL</key>
+  <string>$SPARKLE_FEED_URL</string>
+  <key>SUPublicEDKey</key>
+  <string>$SPARKLE_PUBLIC_ED_KEY</string>
 </dict>
 </plist>
 PLIST

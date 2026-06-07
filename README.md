@@ -48,6 +48,15 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
+Tagged releases also publish `appcast.xml` for Sparkle updates at:
+
+```text
+https://raw.githubusercontent.com/erikrubstein/MacSnap/appcast/appcast.xml
+```
+
+The release workflow requires a GitHub Actions secret named `SPARKLE_PRIVATE_KEY`.
+For this project, the matching public key is embedded in the app bundle by `Packaging/build_dmg.sh`.
+
 The app is not Developer ID signed or notarized yet, so macOS Gatekeeper will warn on first launch after download.
 
 ## Settings

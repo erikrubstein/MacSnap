@@ -2,6 +2,7 @@ import AppKit
 import ApplicationServices
 import Carbon
 import MacSnapCore
+import Sparkle
 
 @_silgen_name("_AXUIElementGetWindow")
 private func AXUIElementGetWindowID(_ element: AXUIElement, _ identifier: UnsafeMutablePointer<CGWindowID>) -> AXError
@@ -13,6 +14,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     private var profileHotKeyManager: HotKeyManager?
     private var settingsWindowController: SettingsWindowController?
     private var dragSnapController: DragSnapController?
+    private var updaterController: SPUStandardUpdaterController?
     private let snapper = WindowSnapper()
     private let settingsStore = SettingsStore()
     private let overlayController = GridOverlayController()
@@ -50,6 +52,11 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         )
         dragSnapController?.start()
 
+        updaterController = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
         configureProfileHotkeys()
     }
 
@@ -76,6 +83,15 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        menu.addItem(.separator())
+        let updateItem = NSMenuItem(
+            title: "Check for Updates...",
+            action: #selector(checkForUpdates(_:)),
+            keyEquivalent: ""
+        )
+        updateItem.target = self
+        menu.addItem(updateItem)
 
         menu.addItem(.separator())
         let quitItem = NSMenuItem(title: "Quit", action: #selector(quit), keyEquivalent: "q")
@@ -212,6 +228,10 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         }
 
         switchToProfile(id: id)
+    }
+
+    @objc private func checkForUpdates(_ sender: Any?) {
+        updaterController?.checkForUpdates(sender)
     }
 
     private func flashGridLayout(selection: OverlaySelectionMode) {
