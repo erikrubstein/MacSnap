@@ -36,7 +36,7 @@ swift run MacSnap
 Build an unsigned macOS app bundle and disk image locally with:
 
 ```sh
-scripts/build_dmg.sh
+Packaging/build_dmg.sh
 ```
 
 The DMG is written to `dist/MacSnap-<version>.dmg`. By default the script builds a universal `arm64` plus `x86_64` app.
@@ -59,7 +59,7 @@ The settings window is split into Profiles, Global, Appearance, and conditional 
 The Profile section includes:
 
 - Profile table with active profile, name, grid, gap, and shortcut.
-- Add, Edit, Delete, Up, and Down buttons.
+- Add, Edit, and Delete buttons, with drag-to-reorder profile rows.
 - A smaller Edit Profile window for name, rows, columns, gap, and shortcut.
 
 The Global section includes:
@@ -102,15 +102,15 @@ Use `Settings...` to add, edit, delete, and reorder profiles. Selecting a row ma
 
 Custom profile shortcuts switch to profiles that have shortcuts assigned.
 
-## Geometry Checks
+## Tests
 
-Run the Phase 2 geometry checks with:
+Run the test suite with:
 
 ```sh
-swift run MacSnapGeometryCheck
+swift test
 ```
 
-This validates grid cell lookup, cell rectangles, span rectangles, common grid sizes, multi-monitor-style coordinate offsets, gap insets, and profile storage.
+This validates grid cell lookup, cell rectangles, span rectangles, common grid sizes, multi-monitor-style coordinate offsets, gap insets, modifier settings, and profile storage.
 
 ## Permission
 
@@ -124,4 +124,4 @@ Then enable the permission for the built executable or Terminal app that launche
 
 ## Notes
 
-Launch at login and a double-clickable app bundle belong in a packaging pass after this SwiftPM prototype.
+Launch at login, signing, and notarization belong in future packaging passes.

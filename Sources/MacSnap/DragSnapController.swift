@@ -18,6 +18,8 @@ final class DragSnapController {
     private var activeSelection: GridSelection?
     private var lastHoveredCell: GridCell?
     private var spanAnchorCell: GridCell?
+    private var isSpanSelectionModeActive = false
+    private var wasSpanTriggerPressed = false
     private var isSnapModeActive = false
 
     init(
@@ -150,7 +152,7 @@ final class DragSnapController {
         }
 
         let selection: GridSelection
-        if isSpanTriggerPressed(settings) {
+        if isSpanSelectionModeActive {
             let anchor = spanAnchorCell ?? lastHoveredCell ?? cell
             spanAnchorCell = anchor
             selection = model.selection(from: anchor, to: cell)
@@ -204,6 +206,10 @@ final class DragSnapController {
     private func handleTriggerChanged() {
         let settings = settingsStore.settings
         let snapTriggerIsPressed = isSnapTriggerPressed(settings)
+        let spanTriggerIsPressed = isSpanTriggerPressed(settings)
+        defer {
+            wasSpanTriggerPressed = spanTriggerIsPressed
+        }
 
         guard isSnapModeActive else {
             if snapTriggerIsPressed, isLeftButtonPressed {
@@ -217,8 +223,21 @@ final class DragSnapController {
             return
         }
 
+        if isLeftButtonPressed, spanTriggerIsPressed, !wasSpanTriggerPressed {
+            toggleSpanSelectionMode()
+        }
+
         if isLeftButtonPressed {
             handleMouseDragged()
+        }
+    }
+
+    private func toggleSpanSelectionMode() {
+        isSpanSelectionModeActive.toggle()
+        if isSpanSelectionModeActive {
+            spanAnchorCell = spanAnchorCell ?? lastHoveredCell
+        } else {
+            spanAnchorCell = nil
         }
     }
 
@@ -247,6 +266,7 @@ final class DragSnapController {
         activeSelection = nil
         lastHoveredCell = nil
         spanAnchorCell = nil
+        isSpanSelectionModeActive = false
         isSnapModeActive = false
         overlayController.hide()
     }
@@ -257,6 +277,8 @@ final class DragSnapController {
         activeSelection = nil
         lastHoveredCell = nil
         spanAnchorCell = nil
+        isSpanSelectionModeActive = false
+        wasSpanTriggerPressed = false
         isSnapModeActive = false
         overlayController.hide()
     }

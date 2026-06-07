@@ -53,6 +53,10 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         configureProfileHotkeys()
     }
 
+    func applicationDidBecomeActive(_ notification: Notification) {
+        settingsWindowController?.reload()
+    }
+
     private func setupMenuBarItem() {
         let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
         item.button?.title = ""
@@ -84,8 +88,10 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     }
 
     private func menuBarIcon() -> NSImage? {
-        let image = Bundle.module.url(forResource: "MacSnapIcon", withExtension: "svg")
-            .flatMap(NSImage.init(contentsOf:))
+        let imageURL = Bundle.main.url(forResource: "MacSnapIcon", withExtension: "svg", subdirectory: "MacSnap_MacSnap.bundle")
+            ?? Bundle.module.url(forResource: "MacSnapIcon", withExtension: "svg")
+
+        let image = imageURL.flatMap(NSImage.init(contentsOf:))
             ?? NSImage(systemSymbolName: "square.grid.2x2", accessibilityDescription: "MacSnap")
 
         image?.size = NSSize(width: 18, height: 18)
@@ -94,11 +100,11 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     }
 
     private func requestAccessibilityPermission() {
-        let trusted = PermissionManager.requestAccessibilityPermission()
+        let trusted = PermissionManager.requestAccessibilityPermissionIfNeeded()
         if trusted {
             NSLog("MacSnap: Accessibility permission is already granted.")
         } else {
-            NSLog("MacSnap: Accessibility permission is required before snapping will work.")
+            NSLog("MacSnap: Accessibility permission is required before snapping will work. Open Settings to grant or refresh permission.")
         }
     }
 

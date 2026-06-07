@@ -132,7 +132,7 @@ Validation command:
 
 ```sh
 cd MacSnap
-swift run MacSnapGeometryCheck
+swift test
 ```
 
 ## Phase 3: Overlay

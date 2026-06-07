@@ -18,10 +18,9 @@ let package = Package(
                 .process("Resources")
             ]
         ),
-        .executableTarget(
-            name: "MacSnapGeometryCheck",
-            dependencies: ["MacSnapCore"],
-            path: "Checks/MacSnapGeometryCheck"
+        .testTarget(
+            name: "MacSnapCoreTests",
+            dependencies: ["MacSnapCore"]
         )
     ]
 )
