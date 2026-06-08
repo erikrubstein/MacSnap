@@ -3,18 +3,18 @@
     <channel>
         <title>MacSnap</title>
         <item>
-            <title>0.1.5</title>
-            <pubDate>Mon, 08 Jun 2026 00:34:37 +0000</pubDate>
+            <title>0.1.6</title>
+            <pubDate>Mon, 08 Jun 2026 15:11:35 +0000</pubDate>
             <link>https://github.com/erikrubstein/MacSnap</link>
-            <sparkle:version>6</sparkle:version>
-            <sparkle:shortVersionString>0.1.5</sparkle:shortVersionString>
+            <sparkle:version>7</sparkle:version>
+            <sparkle:shortVersionString>0.1.6</sparkle:shortVersionString>
             <sparkle:minimumSystemVersion>13.0</sparkle:minimumSystemVersion>
-            <description sparkle:format="markdown"><![CDATA[# MacSnap v0.1.5
+            <description sparkle:format="markdown"><![CDATA[# MacSnap v0.1.6
 
 See the GitHub release for changes:
-https://github.com/erikrubstein/MacSnap/releases/tag/v0.1.5
+https://github.com/erikrubstein/MacSnap/releases/tag/v0.1.6
 ]]></description>
-            <enclosure url="https://github.com/erikrubstein/MacSnap/releases/download/v0.1.5/MacSnap-0.1.5.dmg" length="3772739" type="application/octet-stream" sparkle:edSignature="NFCeEKpSG+OAvCBdwGKGK60c/Ssv59IsiJfHRuCdbL7QIGCmBm5rpebpzDiBG+41Gsk3sbEMpv2JsLaRW+pzDQ=="/>
+            <enclosure url="https://github.com/erikrubstein/MacSnap/releases/download/v0.1.6/MacSnap-0.1.6.dmg" length="3771336" type="application/octet-stream" sparkle:edSignature="nLC5XSz67Zeolc5VbF34TQC52K4fFNglX5I3/TM7JCiBraR4PTlitkDNoHaomzxfaudy/VwjEK1iR5mkCSXaCA=="/>
         </item>
     </channel>
 </rss>
