@@ -901,21 +901,27 @@ final class WindowSnapper {
     private func axPosition(for appKitRect: CGRect) -> CGPoint {
         CGPoint(
             x: appKitRect.minX,
-            y: desktopTopY - appKitRect.maxY
+            y: primaryScreenTopY - appKitRect.maxY
         )
     }
 
     private func appKitRect(fromAXPosition axPosition: CGPoint, size: CGSize) -> CGRect {
         CGRect(
             x: axPosition.x,
-            y: desktopTopY - axPosition.y - size.height,
+            y: primaryScreenTopY - axPosition.y - size.height,
             width: size.width,
             height: size.height
         )
     }
 
-    private var desktopTopY: CGFloat {
-        NSScreen.screens.map(\.frame.maxY).max() ?? NSScreen.main?.frame.maxY ?? 0
+    private var primaryScreenTopY: CGFloat {
+        primaryScreenFrame.maxY
+    }
+
+    private var primaryScreenFrame: CGRect {
+        NSScreen.screens.first { screen in
+            screen.frame.origin == .zero
+        }?.frame ?? NSScreen.screens.first?.frame ?? NSScreen.main?.frame ?? .zero
     }
 
     private func clamp(_ rect: CGRect, to bounds: CGRect?) -> CGRect {
