@@ -52,6 +52,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         lastKnownActiveProfileID = settingsStore.activeProfileID
         settingsWindowController = SettingsWindowController(
             store: settingsStore,
+            overlayController: overlayController,
             onSettingsChanged: { [weak self] _, previewIntent in
                 self?.handleSettingsChanged(previewIntent: previewIntent)
             },
@@ -378,7 +379,10 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
 
     @objc private func showOnboarding() {
         onboardingWindowController?.close()
-        let controller = OnboardingWindowController(store: settingsStore) { [weak self] in
+        let controller = OnboardingWindowController(
+            store: settingsStore,
+            overlayController: overlayController
+        ) { [weak self] in
             guard let self else {
                 return
             }

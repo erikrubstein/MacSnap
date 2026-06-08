@@ -2,9 +2,11 @@ import AppKit
 import MacSnapCore
 
 @MainActor
-final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelegate {
+final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
     private var profile: GridProfile
     private let profilesProvider: () -> [GridProfile]
+    private let overlayController: GridOverlayController
+    private let settingsProvider: () -> GridSettings
     private let onShortcutRecordingChanged: (Bool) -> Void
     private let onSave: (GridProfile) -> Void
     private let labelWidth: CGFloat = 90
@@ -27,11 +29,15 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     init(
         profile: GridProfile,
         profilesProvider: @escaping () -> [GridProfile],
+        overlayController: GridOverlayController,
+        settingsProvider: @escaping () -> GridSettings,
         onShortcutRecordingChanged: @escaping (Bool) -> Void,
         onSave: @escaping (GridProfile) -> Void
     ) {
         self.profile = profile
         self.profilesProvider = profilesProvider
+        self.overlayController = overlayController
+        self.settingsProvider = settingsProvider
         self.onShortcutRecordingChanged = onShortcutRecordingChanged
         self.onSave = onSave
 
@@ -43,15 +49,21 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         )
         window.title = "Edit Profile"
         window.isReleasedWhenClosed = false
+        window.level = GridOverlayController.appWindowLevel
 
         super.init(window: window)
 
+        window.delegate = self
         window.contentView = makeContentView()
         refresh()
     }
 
     required init?(coder: NSCoder) {
         nil
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        overlayController.hide()
     }
 
     private func makeContentView() -> NSView {
@@ -192,6 +204,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         gapSlider.integerValue = profile.gap
         refreshSliderLabels()
         shortcutField.setShortcut(profile.shortcut)
+        showGridOverlay()
     }
 
     private func syncFromFields() {
@@ -208,8 +221,39 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         gapValueLabel.stringValue = "\(gapSlider.integerValue)"
     }
 
+    func showGridOverlay() {
+        let screen = window?.sheetParent?.screen ?? window?.screen ?? NSScreen.main
+        guard let screen else {
+            return
+        }
+
+        let baseSettings = settingsProvider()
+        let settings = GridSettings(
+            rows: rowsSlider.integerValue,
+            columns: columnsSlider.integerValue,
+            gap: gapSlider.integerValue,
+            snapModifier: baseSettings.snapModifier,
+            alternateSnapModifier: baseSettings.alternateSnapModifier,
+            spanModifier: baseSettings.spanModifier,
+            alternateSpanModifier: baseSettings.alternateSpanModifier,
+            useVisibleFrame: baseSettings.useVisibleFrame,
+            restoreSizeOnUnsnap: baseSettings.restoreSizeOnUnsnap,
+            appearance: baseSettings.appearance
+        )
+        let frame = settings.useVisibleFrame ? screen.visibleFrame : screen.frame
+
+        overlayController.update(
+            on: screen,
+            model: GridModel(settings: settings),
+            selection: nil,
+            appearance: settings.appearance,
+            in: frame
+        )
+    }
+
     @objc private func sliderChanged(_ sender: NSSlider) {
         refreshSliderLabels()
+        showGridOverlay()
     }
 
     @objc private func clearShortcutClicked() {
@@ -229,6 +273,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
 
     private func closeSheet() {
         onShortcutRecordingChanged(false)
+        overlayController.hide()
 
         guard let window else {
             return

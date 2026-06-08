@@ -3,6 +3,9 @@ import MacSnapCore
 
 @MainActor
 final class GridOverlayController {
+    static let overlayLevel = NSWindow.Level.statusBar
+    static let appWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
+
     private var window: NSWindow?
     private var overlayView: GridOverlayView?
 
@@ -91,7 +94,7 @@ final class GridOverlayController {
         panel.ignoresMouseEvents = true
         panel.hidesOnDeactivate = false
         panel.collectionBehavior = [.canJoinAllSpaces, .fullScreenAuxiliary, .stationary]
-        panel.level = .statusBar
+        panel.level = Self.overlayLevel
         panel.animationBehavior = .none
 
         window = panel

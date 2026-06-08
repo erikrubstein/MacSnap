@@ -17,6 +17,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     }
 
     private let store: SettingsStore
+    private let overlayController: GridOverlayController
     private let onSettingsChanged: (GridSettings, PreviewIntent) -> Void
     private let onLaunchAtLoginChanged: (Bool) -> Void
     private let onShortcutRecordingChanged: (Bool) -> Void
@@ -46,11 +47,13 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
     init(
         store: SettingsStore,
+        overlayController: GridOverlayController,
         onSettingsChanged: @escaping (GridSettings, PreviewIntent) -> Void,
         onLaunchAtLoginChanged: @escaping (Bool) -> Void,
         onShortcutRecordingChanged: @escaping (Bool) -> Void
     ) {
         self.store = store
+        self.overlayController = overlayController
         self.onSettingsChanged = onSettingsChanged
         self.onLaunchAtLoginChanged = onLaunchAtLoginChanged
         self.onShortcutRecordingChanged = onShortcutRecordingChanged
@@ -65,6 +68,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         window.center()
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert(.moveToActiveSpace)
+        window.level = GridOverlayController.appWindowLevel
         window.minSize = NSSize(width: 760, height: 520)
         window.maxSize = NSSize(width: 760, height: CGFloat.greatestFiniteMagnitude)
 
@@ -783,6 +787,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             profilesProvider: { [weak self] in
                 self?.store.profiles ?? []
             },
+            overlayController: overlayController,
+            settingsProvider: { [weak self] in
+                self?.store.settings ?? SettingsStore.defaultSettings
+            },
             onShortcutRecordingChanged: onShortcutRecordingChanged
         ) { [weak self] updatedProfile in
             guard let self else {
@@ -790,14 +798,16 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             }
 
             store.updateProfile(updatedProfile)
-            store.activeProfileID = updatedProfile.id
             refresh()
-            onSettingsChanged(store.settings, .profileSwitch)
+            onSettingsChanged(store.settings, .none)
         }
 
         profileEditorWindowController = editor
         window?.beginSheet(editor.window!) { [weak self] _ in
             self?.profileEditorWindowController = nil
+        }
+        DispatchQueue.main.async { [weak editor] in
+            editor?.showGridOverlay()
         }
     }
 

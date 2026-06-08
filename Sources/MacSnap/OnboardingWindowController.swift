@@ -2,7 +2,7 @@ import AppKit
 import MacSnapCore
 
 @MainActor
-final class OnboardingWindowController: NSWindowController {
+final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     private enum Step: Int, CaseIterable {
         case welcome
         case permissions
@@ -12,6 +12,7 @@ final class OnboardingWindowController: NSWindowController {
     }
 
     private let store: SettingsStore
+    private let overlayController: GridOverlayController
     private let onFinished: () -> Void
     private let titleLabel = NSTextField(labelWithString: "")
     private let bodyLabel = NSTextField(wrappingLabelWithString: "")
@@ -34,8 +35,13 @@ final class OnboardingWindowController: NSWindowController {
     private var draftSnapModifier: SnapModifier
     private var draftSpanModifier: SnapModifier
 
-    init(store: SettingsStore, onFinished: @escaping () -> Void) {
+    init(
+        store: SettingsStore,
+        overlayController: GridOverlayController,
+        onFinished: @escaping () -> Void
+    ) {
         self.store = store
+        self.overlayController = overlayController
         self.onFinished = onFinished
         draftSnapModifier = store.snapModifier
         draftSpanModifier = store.spanModifier
@@ -50,9 +56,11 @@ final class OnboardingWindowController: NSWindowController {
         window.center()
         window.isReleasedWhenClosed = false
         window.collectionBehavior.insert(.moveToActiveSpace)
+        window.level = GridOverlayController.appWindowLevel
 
         super.init(window: window)
 
+        window.delegate = self
         window.contentView = makeContentView()
         configureControls()
         render()
@@ -66,6 +74,10 @@ final class OnboardingWindowController: NSWindowController {
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
         NSApp.activate(ignoringOtherApps: true)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        overlayController.hide()
     }
 
     private func makeContentView() -> NSView {
@@ -173,6 +185,9 @@ final class OnboardingWindowController: NSWindowController {
 
     private func render() {
         removeContentViews()
+        if currentStep != .profile {
+            overlayController.hide()
+        }
         stepLabel.stringValue = "Step \(currentStep.rawValue + 1) of \(Step.allCases.count)"
         backButton.isEnabled = currentStep != .welcome
         skipButton.isHidden = currentStep == .usage
@@ -249,6 +264,7 @@ final class OnboardingWindowController: NSWindowController {
         contentStack.addArrangedSubview(makeSliderRow(label: "Columns", slider: columnsSlider, valueLabel: columnsValueLabel))
         contentStack.addArrangedSubview(makeSliderRow(label: "Gap", slider: gapSlider, valueLabel: gapValueLabel))
         refreshProfileLabels()
+        showProfileGridOverlay()
     }
 
     private func renderUsage() {
@@ -381,11 +397,41 @@ final class OnboardingWindowController: NSWindowController {
         gapValueLabel.stringValue = "\(gapSlider.integerValue)"
     }
 
+    private func showProfileGridOverlay() {
+        guard let screen = window?.screen ?? NSScreen.main else {
+            return
+        }
+
+        let settings = GridSettings(
+            rows: rowsSlider.integerValue,
+            columns: columnsSlider.integerValue,
+            gap: gapSlider.integerValue,
+            snapModifier: draftSnapModifier,
+            alternateSnapModifier: store.alternateSnapModifier,
+            spanModifier: draftSpanModifier,
+            alternateSpanModifier: store.alternateSpanModifier,
+            useVisibleFrame: store.useVisibleFrame,
+            restoreSizeOnUnsnap: store.restoreSizeOnUnsnap,
+            appearance: store.appearance
+        )
+        let frame = settings.useVisibleFrame ? screen.visibleFrame : screen.frame
+
+        overlayController.update(
+            on: screen,
+            model: GridModel(settings: settings),
+            selection: nil,
+            appearance: settings.appearance,
+            in: frame
+        )
+    }
+
     private func fallbackSpanModifier(for snapModifier: SnapModifier) -> SnapModifier {
         snapModifier == .middleClick ? .option : .middleClick
     }
 
     private func finish(applySettings: Bool) {
+        overlayController.hide()
+
         if applySettings {
             store.snapModifier = draftSnapModifier
             store.spanModifier = draftSpanModifier
@@ -435,6 +481,9 @@ final class OnboardingWindowController: NSWindowController {
 
     @objc private func profileSliderChanged() {
         refreshProfileLabels()
+        if currentStep == .profile {
+            showProfileGridOverlay()
+        }
     }
 
     @objc private func backClicked() {
