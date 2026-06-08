@@ -27,6 +27,39 @@ enum PermissionManager {
         return AXIsProcessTrustedWithOptions(options)
     }
 
+    @discardableResult
+    static func resetAccessibilityPermission(bundleIdentifier: String) -> Bool {
+        UserDefaults.standard.removeObject(forKey: didRequestAccessibilityPromptKey)
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/tccutil")
+        process.arguments = ["reset", "Accessibility", bundleIdentifier]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            NSLog("MacSnap: Failed to reset Accessibility permission: \(error.localizedDescription)")
+            return false
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8)?
+            .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+
+        guard process.terminationStatus == 0 else {
+            NSLog("MacSnap: tccutil reset failed with status \(process.terminationStatus). \(output)")
+            return false
+        }
+
+        NSLog("MacSnap: Reset Accessibility permission for \(bundleIdentifier).")
+        return true
+    }
+
     static func openAccessibilitySettings() {
         guard let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") else {
             return

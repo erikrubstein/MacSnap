@@ -20,6 +20,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     private let overlayController = GridOverlayController()
     private let profilesMenuItem = NSMenuItem(title: "Profiles", action: nil, keyEquivalent: "")
     private let profilesMenu = NSMenu(title: "Profiles")
+    private let lastAccessibilityResetVersionKey = "lastAccessibilityResetVersion"
     private var flashTimer: Timer?
     private var lastKnownActiveProfileID: UUID?
     private var profileHotkeysSuspended = false
@@ -34,6 +35,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarItem()
+        resetAccessibilityPermissionAfterAdHocUpdateIfNeeded()
         requestAccessibilityPermission()
         LaunchAtLoginController.setEnabled(settingsStore.launchAtLogin)
         lastKnownActiveProfileID = settingsStore.activeProfileID
@@ -151,6 +153,50 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         }
 
         return value
+    }
+
+    private func resetAccessibilityPermissionAfterAdHocUpdateIfNeeded() {
+        guard isUpdaterConfigured,
+              isAdHocSignedAppBundle,
+              let bundleIdentifier = Bundle.main.bundleIdentifier,
+              let version = bundleString("CFBundleShortVersionString")
+        else {
+            return
+        }
+
+        guard UserDefaults.standard.string(forKey: lastAccessibilityResetVersionKey) != version else {
+            return
+        }
+
+        if PermissionManager.resetAccessibilityPermission(bundleIdentifier: bundleIdentifier) {
+            UserDefaults.standard.set(version, forKey: lastAccessibilityResetVersionKey)
+        }
+    }
+
+    private var isAdHocSignedAppBundle: Bool {
+        guard Bundle.main.bundleURL.pathExtension == "app" else {
+            return false
+        }
+
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/usr/bin/codesign")
+        process.arguments = ["-dv", "--verbose=2", Bundle.main.bundleURL.path]
+
+        let pipe = Pipe()
+        process.standardOutput = pipe
+        process.standardError = pipe
+
+        do {
+            try process.run()
+            process.waitUntilExit()
+        } catch {
+            NSLog("MacSnap: Failed to inspect code signature: \(error.localizedDescription)")
+            return false
+        }
+
+        let data = pipe.fileHandleForReading.readDataToEndOfFile()
+        let output = String(data: data, encoding: .utf8) ?? ""
+        return output.contains("Signature=adhoc")
     }
 
     private func requestAccessibilityPermission() {
