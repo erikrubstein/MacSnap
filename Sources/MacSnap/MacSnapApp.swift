@@ -56,11 +56,15 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         )
         dragSnapController?.start()
 
-        updaterController = SPUStandardUpdaterController(
-            startingUpdater: true,
-            updaterDelegate: nil,
-            userDriverDelegate: nil
-        )
+        if isUpdaterConfigured {
+            updaterController = SPUStandardUpdaterController(
+                startingUpdater: true,
+                updaterDelegate: nil,
+                userDriverDelegate: nil
+            )
+        } else {
+            NSLog("MacSnap: Sparkle updater is unavailable without packaged app metadata.")
+        }
         configureProfileHotkeys()
     }
 
@@ -89,12 +93,17 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         menu.addItem(settingsItem)
 
         menu.addItem(.separator())
+        let versionItem = NSMenuItem(title: appVersionMenuTitle(), action: nil, keyEquivalent: "")
+        versionItem.isEnabled = false
+        menu.addItem(versionItem)
+
         let updateItem = NSMenuItem(
             title: "Check for Updates...",
             action: #selector(checkForUpdates(_:)),
             keyEquivalent: ""
         )
         updateItem.target = self
+        updateItem.isEnabled = isUpdaterConfigured
         menu.addItem(updateItem)
 
         menu.addItem(.separator())
@@ -117,6 +126,31 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         image?.size = NSSize(width: 18, height: 18)
         image?.isTemplate = true
         return image
+    }
+
+    private func appVersionMenuTitle() -> String {
+        let version = Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? "Development"
+        let build = Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String
+
+        if let build, !build.isEmpty, build != version {
+            return "Version \(version) (\(build))"
+        }
+
+        return "Version \(version)"
+    }
+
+    private var isUpdaterConfigured: Bool {
+        bundleString("SUFeedURL") != nil && bundleString("SUPublicEDKey") != nil
+    }
+
+    private func bundleString(_ key: String) -> String? {
+        guard let value = Bundle.main.object(forInfoDictionaryKey: key) as? String,
+              !value.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty
+        else {
+            return nil
+        }
+
+        return value
     }
 
     private func requestAccessibilityPermission() {
