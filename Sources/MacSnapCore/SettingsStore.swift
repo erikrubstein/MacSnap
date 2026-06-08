@@ -279,6 +279,22 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
     }
 }
 
+public struct DisplayProfileAssignment: Codable, Equatable, Identifiable, Sendable {
+    public var displayID: String
+    public var displayName: String
+    public var profileID: UUID
+
+    public var id: String {
+        displayID
+    }
+
+    public init(displayID: String, displayName: String, profileID: UUID) {
+        self.displayID = displayID
+        self.displayName = displayName
+        self.profileID = profileID
+    }
+}
+
 public final class SettingsStore {
     private enum Key {
         static let rows = "gridRows"
@@ -286,6 +302,7 @@ public final class SettingsStore {
         static let gap = "gridGap"
         static let profiles = "gridProfiles"
         static let activeProfileID = "activeProfileID"
+        static let displayProfileAssignments = "displayProfileAssignments"
         static let snapModifier = "snapModifier"
         static let alternateSnapModifier = "alternateSnapModifier"
         static let spanModifier = "spanModifier"
@@ -332,18 +349,7 @@ public final class SettingsStore {
 
     public var settings: GridSettings {
         get {
-            GridSettings(
-                rows: rows,
-                columns: columns,
-                gap: gap,
-                snapModifier: snapModifier,
-                alternateSnapModifier: alternateSnapModifier,
-                spanModifier: spanModifier,
-                alternateSpanModifier: alternateSpanModifier,
-                useVisibleFrame: useVisibleFrame,
-                restoreSizeOnUnsnap: restoreSizeOnUnsnap,
-                appearance: appearance
-            )
+            settings(for: activeProfile)
         }
         set {
             rows = newValue.rows
@@ -357,6 +363,16 @@ public final class SettingsStore {
             restoreSizeOnUnsnap = newValue.restoreSizeOnUnsnap
             appearance = newValue.appearance
         }
+    }
+
+    public func settings(forDisplayID displayID: String?) -> GridSettings {
+        guard let displayID,
+              let profile = profile(forDisplayID: displayID)
+        else {
+            return settings
+        }
+
+        return settings(for: profile)
     }
 
     public var rows: Int {
@@ -426,6 +442,62 @@ public final class SettingsStore {
 
     public var activeProfile: GridProfile {
         profiles.first(where: { $0.id == activeProfileID }) ?? Self.defaultProfile
+    }
+
+    public var displayProfileAssignments: [DisplayProfileAssignment] {
+        get {
+            loadDisplayProfileAssignments()
+        }
+        set {
+            saveDisplayProfileAssignments(newValue)
+        }
+    }
+
+    public func displayProfileAssignment(forDisplayID displayID: String) -> DisplayProfileAssignment? {
+        displayProfileAssignments.first { $0.displayID == displayID }
+    }
+
+    public func profileID(forDisplayID displayID: String) -> UUID? {
+        guard let assignment = displayProfileAssignment(forDisplayID: displayID),
+              profiles.contains(where: { $0.id == assignment.profileID })
+        else {
+            return nil
+        }
+
+        return assignment.profileID
+    }
+
+    public func profile(forDisplayID displayID: String) -> GridProfile? {
+        guard let profileID = profileID(forDisplayID: displayID) else {
+            return nil
+        }
+
+        return profiles.first { $0.id == profileID }
+    }
+
+    public func setProfile(_ profileID: UUID?, forDisplayID displayID: String, displayName: String) {
+        let sanitizedDisplayID = displayID.trimmingCharacters(in: .whitespacesAndNewlines)
+        guard !sanitizedDisplayID.isEmpty else {
+            return
+        }
+
+        var assignments = displayProfileAssignments.filter { $0.displayID != sanitizedDisplayID }
+        guard let profileID else {
+            displayProfileAssignments = assignments
+            return
+        }
+
+        guard profiles.contains(where: { $0.id == profileID }) else {
+            return
+        }
+
+        let sanitizedDisplayName = displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+        assignments.append(DisplayProfileAssignment(
+            displayID: sanitizedDisplayID,
+            displayName: sanitizedDisplayName.isEmpty ? "Display" : sanitizedDisplayName,
+            profileID: profileID
+        ))
+        displayProfileAssignments = assignments
     }
 
     public func addProfile() -> GridProfile {
@@ -670,6 +742,7 @@ public final class SettingsStore {
         activeProfileID = Self.defaultProfile.id
         settings = Self.defaultSettings
         launchAtLogin = true
+        displayProfileAssignments = []
     }
 
     private func ensureDefaults() {
@@ -759,6 +832,61 @@ public final class SettingsStore {
         if !sanitizedProfiles.contains(where: { $0.id == activeProfileID }) {
             defaults.set(sanitizedProfiles[0].id.uuidString, forKey: Key.activeProfileID)
         }
+
+        sanitizeDisplayProfileAssignments(validProfileIDs: Set(sanitizedProfiles.map(\.id)))
+    }
+
+    private func settings(for profile: GridProfile) -> GridSettings {
+        GridSettings(
+            rows: profile.rows,
+            columns: profile.columns,
+            gap: profile.gap,
+            snapModifier: snapModifier,
+            alternateSnapModifier: alternateSnapModifier,
+            spanModifier: spanModifier,
+            alternateSpanModifier: alternateSpanModifier,
+            useVisibleFrame: useVisibleFrame,
+            restoreSizeOnUnsnap: restoreSizeOnUnsnap,
+            appearance: appearance
+        )
+    }
+
+    private func loadDisplayProfileAssignments() -> [DisplayProfileAssignment] {
+        guard let data = defaults.data(forKey: Key.displayProfileAssignments),
+              let decodedAssignments = try? JSONDecoder().decode([DisplayProfileAssignment].self, from: data)
+        else {
+            return []
+        }
+
+        let sanitizedAssignments = sanitize(decodedAssignments, validProfileIDs: Set(profiles.map(\.id)))
+        if sanitizedAssignments != decodedAssignments {
+            saveDisplayProfileAssignments(sanitizedAssignments)
+        }
+
+        return sanitizedAssignments
+    }
+
+    private func saveDisplayProfileAssignments(_ assignments: [DisplayProfileAssignment]) {
+        let sanitizedAssignments = sanitize(assignments, validProfileIDs: Set(profiles.map(\.id)))
+        guard let data = try? JSONEncoder().encode(sanitizedAssignments) else {
+            return
+        }
+
+        defaults.set(data, forKey: Key.displayProfileAssignments)
+    }
+
+    private func sanitizeDisplayProfileAssignments(validProfileIDs: Set<UUID>) {
+        let assignments = displayProfileAssignments
+        let sanitizedAssignments = sanitize(assignments, validProfileIDs: validProfileIDs)
+        guard sanitizedAssignments != assignments else {
+            return
+        }
+
+        guard let data = try? JSONEncoder().encode(sanitizedAssignments) else {
+            return
+        }
+
+        defaults.set(data, forKey: Key.displayProfileAssignments)
     }
 
     private func updateActiveProfile(_ update: (inout GridProfile) -> Void) {
@@ -794,6 +922,31 @@ public final class SettingsStore {
             }
 
             return sanitizedProfile
+        }
+    }
+
+    private func sanitize(
+        _ assignments: [DisplayProfileAssignment],
+        validProfileIDs: Set<UUID>
+    ) -> [DisplayProfileAssignment] {
+        var seenDisplayIDs = Set<String>()
+
+        return assignments.compactMap { assignment in
+            let displayID = assignment.displayID.trimmingCharacters(in: .whitespacesAndNewlines)
+            guard !displayID.isEmpty,
+                  validProfileIDs.contains(assignment.profileID),
+                  !seenDisplayIDs.contains(displayID)
+            else {
+                return nil
+            }
+
+            seenDisplayIDs.insert(displayID)
+            let displayName = assignment.displayName.trimmingCharacters(in: .whitespacesAndNewlines)
+            return DisplayProfileAssignment(
+                displayID: displayID,
+                displayName: displayName.isEmpty ? "Display" : displayName,
+                profileID: assignment.profileID
+            )
         }
     }
 

@@ -186,4 +186,37 @@ final class MacSnapCoreTests: XCTestCase {
         store.reset()
         XCTAssertTrue(store.launchAtLogin)
     }
+
+    func testDisplayProfileAssignmentsPersistAndFallback() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        let defaultProfileID = store.activeProfileID
+        store.columns = 2
+
+        var externalProfile = store.addProfile()
+        externalProfile.name = "External"
+        externalProfile.columns = 4
+        store.updateProfile(externalProfile)
+        store.activeProfileID = defaultProfileID
+
+        store.setProfile(externalProfile.id, forDisplayID: "external-display", displayName: "External Display")
+
+        XCTAssertEqual(store.profileID(forDisplayID: "external-display"), externalProfile.id)
+        XCTAssertEqual(store.settings.columns, 2)
+        XCTAssertEqual(store.settings(forDisplayID: "external-display").columns, 4)
+        XCTAssertEqual(store.settings(forDisplayID: "unknown-display").columns, 2)
+
+        let reloadedStore = SettingsStore(defaults: defaults)
+        XCTAssertEqual(reloadedStore.profileID(forDisplayID: "external-display"), externalProfile.id)
+        XCTAssertEqual(reloadedStore.settings(forDisplayID: "external-display").columns, 4)
+
+        reloadedStore.deleteProfile(id: externalProfile.id)
+        XCTAssertNil(reloadedStore.profileID(forDisplayID: "external-display"))
+        XCTAssertEqual(reloadedStore.settings(forDisplayID: "external-display").columns, 2)
+    }
 }

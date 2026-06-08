@@ -130,8 +130,9 @@ final class DragSnapController {
             return
         }
 
-        let frame = screenFrame(for: screen, settings: settings)
-        let model = GridModel(settings: settings)
+        let screenSettings = settingsStore.settings(forDisplayID: DisplayIdentity(screen: screen).id)
+        let frame = screenFrame(for: screen, settings: screenSettings)
+        let model = GridModel(settings: screenSettings)
         guard let cell = model.cell(at: mouseLocation, in: frame) else {
             activeScreen = screen
             activeSelection = nil
@@ -140,7 +141,7 @@ final class DragSnapController {
                 on: screen,
                 model: model,
                 selection: nil,
-                appearance: settings.appearance,
+                appearance: screenSettings.appearance,
                 in: frame
             )
             return
@@ -169,7 +170,7 @@ final class DragSnapController {
             on: screen,
             model: model,
             selection: selection,
-            appearance: settings.appearance,
+            appearance: screenSettings.appearance,
             in: frame
         )
     }
@@ -179,13 +180,16 @@ final class DragSnapController {
             reset()
         }
 
-        let settings = settingsStore.settings
         guard isSnapModeActive,
-              isSnapTriggerPressed(settings),
               let candidateWindow,
               let activeScreen,
               let activeSelection
         else {
+            return
+        }
+
+        let settings = settingsStore.settings(forDisplayID: DisplayIdentity(screen: activeScreen).id)
+        guard isSnapTriggerPressed(settings) else {
             return
         }
 

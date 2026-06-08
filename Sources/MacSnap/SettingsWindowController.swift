@@ -10,7 +10,6 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     }
 
     private enum Column {
-        static let active = NSUserInterfaceItemIdentifier("active")
         static let name = NSUserInterfaceItemIdentifier("name")
         static let grid = NSUserInterfaceItemIdentifier("grid")
         static let gap = NSUserInterfaceItemIdentifier("gap")
@@ -33,6 +32,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private let launchAtLoginSwitch = NSSwitch()
     private let visibleFrameSwitch = NSSwitch()
     private let restoreSizeSwitch = NSSwitch()
+    private let displayAssignmentsStack = NSStackView()
     private let backgroundColorWell = NSColorWell()
     private let gridLineColorWell = NSColorWell()
     private let selectionColorWell = NSColorWell()
@@ -40,6 +40,8 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private let rowLabelWidth: CGFloat = 230
 
     private var isRefreshing = false
+    private var displayAssignmentPopups: [NSPopUpButton: DisplayIdentity] = [:]
+    private var helpPopover: NSPopover?
     private var profileEditorWindowController: ProfileEditorWindowController?
 
     init(
@@ -55,13 +57,16 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
         let window = NSWindow(
             contentRect: NSRect(x: 0, y: 0, width: 760, height: 750),
-            styleMask: [.titled, .closable, .miniaturizable],
+            styleMask: [.titled, .closable, .miniaturizable, .resizable],
             backing: .buffered,
             defer: false
         )
         window.title = "MacSnap Settings"
         window.center()
         window.isReleasedWhenClosed = false
+        window.collectionBehavior.insert(.moveToActiveSpace)
+        window.minSize = NSSize(width: 760, height: 520)
+        window.maxSize = NSSize(width: 760, height: CGFloat.greatestFiniteMagnitude)
 
         super.init(window: window)
 
@@ -75,6 +80,9 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
     override func showWindow(_ sender: Any?) {
         refresh()
+        if window?.isVisible == false {
+            moveWindowToCurrentScreen()
+        }
         super.showWindow(sender)
         window?.makeKeyAndOrderFront(sender)
         NSApp.activate(ignoringOtherApps: true)
@@ -84,8 +92,38 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         refresh()
     }
 
+    private func moveWindowToCurrentScreen() {
+        guard let window else {
+            return
+        }
+
+        let mouseLocation = NSEvent.mouseLocation
+        let screen = NSScreen.screens.first { screen in
+            screen.visibleFrame.contains(mouseLocation) || screen.frame.contains(mouseLocation)
+        } ?? NSScreen.main
+
+        guard let screen else {
+            window.center()
+            return
+        }
+
+        let visibleFrame = screen.visibleFrame
+        var frame = window.frame
+        frame.origin.x = visibleFrame.midX - frame.width / 2
+        frame.origin.y = visibleFrame.midY - frame.height / 2
+        window.setFrame(frame, display: false)
+    }
+
     private func makeContentView() -> NSView {
+        let scrollView = NSScrollView()
+        scrollView.borderType = .noBorder
+        scrollView.drawsBackground = false
+        scrollView.hasVerticalScroller = true
+        scrollView.hasHorizontalScroller = false
+        scrollView.autohidesScrollers = true
+
         let container = NSView()
+        container.translatesAutoresizingMaskIntoConstraints = false
 
         let stack = NSStackView()
         stack.orientation = .vertical
@@ -93,9 +131,37 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         stack.spacing = 22
         stack.translatesAutoresizingMaskIntoConstraints = false
 
-        stack.addArrangedSubview(makeSection(title: "Profiles", rows: [makeProfilesTable(), makeProfileButtonRow()]))
+        let permissionSection = makeSection(
+            title: "Permissions",
+            help: "MacSnap needs Accessibility permission so it can read and move windows.",
+            rows: [makePermissionRow()]
+        )
+        self.permissionSection = permissionSection
+        stack.addArrangedSubview(permissionSection)
+        stack.addArrangedSubview(makeSection(
+            title: "Profiles",
+            help: "Create reusable grid layouts. Rows and columns define the grid, gap adds spacing around snapped windows, and shortcut lets you switch profiles from the keyboard. Select a row to edit or delete it.",
+            rows: [
+                makeProfilesTable(),
+                makeProfileButtonRow()
+            ]
+        ))
+        stack.addArrangedSubview(makeSection(
+            title: "Displays",
+            help: "Choose the default profile used everywhere, then assign different profiles to connected displays when you want each screen to use its own grid.",
+            rows: [
+                makeDisplayAssignmentsView()
+            ]
+        ))
         stack.addArrangedSubview(makeSection(
             title: "Global",
+            help: """
+            Snap modifiers show the grid while you drag a window. You can set a primary modifier and, optionally, an alternate modifier that does the same thing.
+
+            Span modifiers toggle span mode while snapping, letting you select multiple grid cells instead of only one.
+
+            The switches control startup behavior, whether snapping avoids the menu bar and Dock, and whether windows restore their previous size when dragged away.
+            """,
             rows: [
                 makeModifierRow(),
                 makeAlternateSnapModifierRow(),
@@ -108,37 +174,49 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         ))
         stack.addArrangedSubview(makeSection(
             title: "Appearance",
+            help: "Customize the colors used by the grid overlay while snapping.",
             rows: [
                 makeColorRow(label: "Background", colorWell: backgroundColorWell),
                 makeColorRow(label: "Grid lines", colorWell: gridLineColorWell),
                 makeColorRow(label: "Selection", colorWell: selectionColorWell)
             ]
         ))
-        let permissionSection = makeSection(title: "Permissions", rows: [makePermissionRow()])
-        self.permissionSection = permissionSection
-        stack.addArrangedSubview(permissionSection)
         stack.addArrangedSubview(makeFooterRow())
 
         container.addSubview(stack)
+        scrollView.documentView = container
 
         NSLayoutConstraint.activate([
+            container.leadingAnchor.constraint(equalTo: scrollView.contentView.leadingAnchor),
+            container.trailingAnchor.constraint(equalTo: scrollView.contentView.trailingAnchor),
+            container.topAnchor.constraint(equalTo: scrollView.contentView.topAnchor),
+            container.widthAnchor.constraint(equalTo: scrollView.contentView.widthAnchor),
             stack.leadingAnchor.constraint(equalTo: container.leadingAnchor, constant: 24),
             stack.trailingAnchor.constraint(lessThanOrEqualTo: container.trailingAnchor, constant: -24),
             stack.topAnchor.constraint(equalTo: container.topAnchor, constant: 24),
-            stack.bottomAnchor.constraint(lessThanOrEqualTo: container.bottomAnchor, constant: -24)
+            stack.bottomAnchor.constraint(equalTo: container.bottomAnchor, constant: -24)
         ])
 
-        return container
+        return scrollView
     }
 
-    private func makeSection(title: String, rows: [NSView]) -> NSView {
+    private func makeSection(title: String, help: String? = nil, rows: [NSView]) -> NSView {
         let wrapper = NSStackView()
         wrapper.orientation = .vertical
         wrapper.alignment = .leading
         wrapper.spacing = 8
 
+        let titleRow = NSStackView()
+        titleRow.orientation = .horizontal
+        titleRow.alignment = .centerY
+        titleRow.spacing = 6
+
         let titleView = NSTextField(labelWithString: title)
         titleView.font = .systemFont(ofSize: 15, weight: .semibold)
+        titleRow.addArrangedSubview(titleView)
+        if let help {
+            titleRow.addArrangedSubview(makeHelpButton(help))
+        }
 
         let box = NSBox()
         box.title = ""
@@ -166,10 +244,62 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             stack.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -12)
         ])
 
-        wrapper.addArrangedSubview(titleView)
+        wrapper.addArrangedSubview(titleRow)
         wrapper.addArrangedSubview(box)
 
         return wrapper
+    }
+
+    private func makeSettingLabel(_ title: String, tooltip: String? = nil) -> NSTextField {
+        let label = NSTextField(labelWithString: title)
+        label.lineBreakMode = .byTruncatingTail
+        label.toolTip = tooltip
+        label.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        return label
+    }
+
+    private func makeHelpButton(_ help: String) -> NSButton {
+        let image = NSImage(systemSymbolName: "questionmark.circle", accessibilityDescription: help)
+        image?.isTemplate = true
+
+        let button = HelpButton(helpText: help)
+        button.image = image
+        button.target = self
+        button.action = #selector(showHelp(_:))
+        return button
+    }
+
+    @objc private func showHelp(_ sender: NSButton) {
+        guard let sender = sender as? HelpButton else {
+            return
+        }
+
+        helpPopover?.close()
+
+        let label = NSTextField(wrappingLabelWithString: sender.helpText)
+        label.font = .systemFont(ofSize: 13)
+        label.textColor = .labelColor
+        label.translatesAutoresizingMaskIntoConstraints = false
+
+        let contentView = NSView()
+        contentView.addSubview(label)
+
+        NSLayoutConstraint.activate([
+            label.leadingAnchor.constraint(equalTo: contentView.leadingAnchor, constant: 12),
+            label.trailingAnchor.constraint(equalTo: contentView.trailingAnchor, constant: -12),
+            label.topAnchor.constraint(equalTo: contentView.topAnchor, constant: 10),
+            label.bottomAnchor.constraint(equalTo: contentView.bottomAnchor, constant: -10),
+            label.widthAnchor.constraint(equalToConstant: 280)
+        ])
+
+        let viewController = NSViewController()
+        viewController.view = contentView
+
+        let popover = NSPopover()
+        popover.behavior = .transient
+        popover.contentViewController = viewController
+        popover.show(relativeTo: sender.bounds, of: sender, preferredEdge: .maxY)
+        helpPopover = popover
     }
 
     private func makeProfilesTable() -> NSView {
@@ -179,17 +309,15 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         profilesTableView.rowHeight = 28
         profilesTableView.usesAlternatingRowBackgroundColors = true
         profilesTableView.allowsMultipleSelection = false
-        profilesTableView.action = #selector(profileClicked)
         profilesTableView.doubleAction = #selector(editProfileClicked)
         profilesTableView.target = self
         profilesTableView.registerForDraggedTypes([profilePasteboardType])
         profilesTableView.setDraggingSourceOperationMask(.move, forLocal: true)
 
-        addColumn(id: Column.active, title: "", width: 34)
-        addColumn(id: Column.name, title: "Name", width: 210)
-        addColumn(id: Column.grid, title: "Grid", width: 120)
-        addColumn(id: Column.gap, title: "Gap", width: 70)
-        addColumn(id: Column.shortcut, title: "Shortcut", width: 246)
+        addColumn(id: Column.name, title: "Name", width: 250)
+        addColumn(id: Column.grid, title: "Grid", width: 130)
+        addColumn(id: Column.gap, title: "Gap", width: 80)
+        addColumn(id: Column.shortcut, title: "Shortcut", width: 220)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -227,14 +355,84 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         return row
     }
 
+    private func makeDisplayAssignmentsView() -> NSView {
+        displayAssignmentsStack.orientation = .vertical
+        displayAssignmentsStack.alignment = .leading
+        displayAssignmentsStack.spacing = 10
+        return displayAssignmentsStack
+    }
+
+    private func makeDefaultProfileRow() -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = makeSettingLabel("Default Profile")
+
+        let popup = NSPopUpButton()
+        for profile in store.profiles {
+            popup.addItem(withTitle: profile.name)
+            popup.lastItem?.representedObject = profile.id.uuidString
+        }
+
+        if let index = store.profiles.firstIndex(where: { $0.id == store.activeProfileID }) {
+            popup.selectItem(at: index)
+        }
+
+        popup.target = self
+        popup.action = #selector(defaultProfileChanged(_:))
+        popup.widthAnchor.constraint(equalToConstant: 240).isActive = true
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(popup)
+
+        return row
+    }
+
+    private func makeDisplayAssignmentRow(for display: DisplayIdentity) -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = makeSettingLabel(display.name, tooltip: display.id)
+
+        let popup = NSPopUpButton()
+        popup.addItem(withTitle: "Use Default (\(store.activeProfile.name))")
+        popup.lastItem?.representedObject = nil
+
+        for profile in store.profiles {
+            popup.addItem(withTitle: profile.name)
+            popup.lastItem?.representedObject = profile.id.uuidString
+        }
+
+        let assignedProfileID = store.profileID(forDisplayID: display.id)
+        if let assignedProfileID,
+           let index = store.profiles.firstIndex(where: { $0.id == assignedProfileID }) {
+            popup.selectItem(at: index + 1)
+        } else {
+            popup.selectItem(at: 0)
+        }
+
+        popup.target = self
+        popup.action = #selector(displayAssignmentChanged(_:))
+        popup.widthAnchor.constraint(equalToConstant: 240).isActive = true
+        displayAssignmentPopups[popup] = display
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(popup)
+
+        return row
+    }
+
     private func makeColorRow(label: String, colorWell: NSColorWell) -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: label)
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel(label)
 
         colorWell.target = self
         colorWell.action = #selector(colorWellChanged(_:))
@@ -257,8 +455,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Snap modifier")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Snap modifier")
 
         snapModifierPopup.removeAllItems()
         snapModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
@@ -278,8 +475,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Alternate snap modifier")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Alternate snap modifier")
 
         alternateSnapModifierPopup.removeAllItems()
         alternateSnapModifierPopup.addItems(withTitles: optionalModifierTitles)
@@ -299,8 +495,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Span modifier")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Span modifier")
 
         spanModifierPopup.removeAllItems()
         spanModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
@@ -320,8 +515,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Alternate span modifier")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Alternate span modifier")
 
         alternateSpanModifierPopup.removeAllItems()
         alternateSpanModifierPopup.addItems(withTitles: optionalModifierTitles)
@@ -341,8 +535,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Avoid menu bar and Dock")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Avoid menu bar and Dock")
 
         visibleFrameSwitch.target = self
         visibleFrameSwitch.action = #selector(visibleFrameSwitchChanged(_:))
@@ -359,8 +552,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Launch at login")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Launch at login")
 
         launchAtLoginSwitch.target = self
         launchAtLoginSwitch.action = #selector(launchAtLoginSwitchChanged(_:))
@@ -377,8 +569,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = NSTextField(labelWithString: "Restore size when unsnapped")
-        labelView.widthAnchor.constraint(equalToConstant: rowLabelWidth).isActive = true
+        let labelView = makeSettingLabel("Restore size when unsnapped")
 
         restoreSizeSwitch.target = self
         restoreSizeSwitch.action = #selector(restoreSizeSwitchChanged(_:))
@@ -394,6 +585,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.orientation = .horizontal
         row.alignment = .top
         row.spacing = 12
+        row.widthAnchor.constraint(equalToConstant: 680).isActive = true
 
         let labelView = NSTextField(labelWithString: "MacSnap needs Accessibility permission before snapping can work.")
         labelView.lineBreakMode = .byWordWrapping
@@ -437,11 +629,14 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
 
         let settings = store.settings
-        let activeProfile = store.activeProfile
+        let previouslySelectedProfileID = selectedProfile?.id
 
         profilesTableView.reloadData()
-        if let row = store.profiles.firstIndex(where: { $0.id == activeProfile.id }) {
+        if let previouslySelectedProfileID,
+           let row = store.profiles.firstIndex(where: { $0.id == previouslySelectedProfileID }) {
             profilesTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+        } else if profilesTableView.selectedRow >= store.profiles.count {
+            profilesTableView.deselectAll(nil)
         }
 
         editProfileButton.isEnabled = selectedProfile != nil
@@ -456,6 +651,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         backgroundColorWell.color = NSColor(gridColor: settings.appearance.backgroundColor)
         gridLineColorWell.color = NSColor(gridColor: settings.appearance.gridLineColor)
         selectionColorWell.color = NSColor(gridColor: settings.appearance.selectionColor)
+        refreshDisplayAssignments()
 
         permissionSection?.isHidden = PermissionManager.isAccessibilityTrusted
     }
@@ -466,6 +662,38 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             return nil
         }
         return store.profiles[row]
+    }
+
+    private func selectProfile(id: UUID?) {
+        guard let id,
+              let row = store.profiles.firstIndex(where: { $0.id == id })
+        else {
+            profilesTableView.deselectAll(nil)
+            return
+        }
+
+        profilesTableView.selectRowIndexes(IndexSet(integer: row), byExtendingSelection: false)
+    }
+
+    private func refreshDisplayAssignments() {
+        for view in displayAssignmentsStack.arrangedSubviews {
+            displayAssignmentsStack.removeArrangedSubview(view)
+            view.removeFromSuperview()
+        }
+        displayAssignmentPopups.removeAll()
+        displayAssignmentsStack.addArrangedSubview(makeDefaultProfileRow())
+
+        let screens = NSScreen.screens
+        guard !screens.isEmpty else {
+            let label = NSTextField(labelWithString: "No active displays")
+            label.textColor = .secondaryLabelColor
+            displayAssignmentsStack.addArrangedSubview(label)
+            return
+        }
+
+        for screen in screens {
+            displayAssignmentsStack.addArrangedSubview(makeDisplayAssignmentRow(for: DisplayIdentity(screen: screen)))
+        }
     }
 
     func numberOfRows(in tableView: NSTableView) -> Int {
@@ -481,8 +709,6 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         let text: String
 
         switch tableColumn.identifier {
-        case Column.active:
-            text = profile.id == store.activeProfileID ? "✓" : ""
         case Column.name:
             text = profile.name
         case Column.grid:
@@ -525,21 +751,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         deleteProfileButton.isEnabled = store.profiles.count > 1
     }
 
-    @objc private func profileClicked() {
-        guard let selectedProfile,
-              selectedProfile.id != store.activeProfileID
-        else {
-            return
-        }
-
-        store.activeProfileID = selectedProfile.id
-        refresh()
-        onSettingsChanged(store.settings, .profileSwitch)
-    }
-
     @objc private func addProfileClicked() {
         let profile = store.addProfile()
         refresh()
+        selectProfile(id: profile.id)
         onSettingsChanged(store.settings, .none)
         showEditor(for: profile)
     }
@@ -668,6 +883,33 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         saveGlobal(restoreSizeOnUnsnap: sender.state == .on)
     }
 
+    @objc private func defaultProfileChanged(_ sender: NSPopUpButton) {
+        guard !isRefreshing,
+              let rawID = sender.selectedItem?.representedObject as? String,
+              let profileID = UUID(uuidString: rawID),
+              profileID != store.activeProfileID
+        else {
+            return
+        }
+
+        store.activeProfileID = profileID
+        refresh()
+        onSettingsChanged(store.settings, .profileSwitch)
+    }
+
+    @objc private func displayAssignmentChanged(_ sender: NSPopUpButton) {
+        guard !isRefreshing,
+              let display = displayAssignmentPopups[sender]
+        else {
+            return
+        }
+
+        let profileID = (sender.selectedItem?.representedObject as? String).flatMap(UUID.init(uuidString:))
+        store.setProfile(profileID, forDisplayID: display.id, displayName: display.name)
+        refresh()
+        onSettingsChanged(store.settings, .none)
+    }
+
     @objc private func colorWellChanged(_ sender: NSColorWell) {
         NSColorPanel.shared.showsAlpha = true
         store.appearance = GridAppearance(
@@ -766,6 +1008,30 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
         onSettingsChanged(store.settings, .none)
         return true
+    }
+}
+
+private final class HelpButton: NSButton {
+    let helpText: String
+
+    init(helpText: String) {
+        self.helpText = helpText
+        super.init(frame: .zero)
+
+        bezelStyle = .inline
+        isBordered = false
+        imagePosition = .imageOnly
+        contentTintColor = .secondaryLabelColor
+        toolTip = helpText
+        translatesAutoresizingMaskIntoConstraints = false
+        widthAnchor.constraint(equalToConstant: 16).isActive = true
+        heightAnchor.constraint(equalToConstant: 16).isActive = true
+        setContentHuggingPriority(.required, for: .horizontal)
+        setContentCompressionResistancePriority(.required, for: .horizontal)
+    }
+
+    required init?(coder: NSCoder) {
+        nil
     }
 }
 

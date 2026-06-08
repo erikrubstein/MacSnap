@@ -35,6 +35,12 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
 
     func applicationDidFinishLaunching(_ notification: Notification) {
         setupMenuBarItem()
+        NotificationCenter.default.addObserver(
+            self,
+            selector: #selector(screenParametersChanged),
+            name: NSApplication.didChangeScreenParametersNotification,
+            object: nil
+        )
         resetAccessibilityPermissionAfterAdHocUpdateIfNeeded()
         requestAccessibilityPermission()
         LaunchAtLoginController.setEnabled(settingsStore.launchAtLogin)
@@ -215,20 +221,64 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     private func rebuildProfilesMenu() {
         profilesMenu.removeAllItems()
 
+        let defaultItem = NSMenuItem(title: "Default Profile", action: nil, keyEquivalent: "")
+        defaultItem.submenu = profileSelectionMenu(display: nil)
+        profilesMenu.addItem(defaultItem)
+
+        profilesMenu.addItem(.separator())
+
+        for screen in NSScreen.screens {
+            let display = DisplayIdentity(screen: screen)
+            let item = NSMenuItem(title: display.name, action: nil, keyEquivalent: "")
+            item.submenu = profileSelectionMenu(display: display)
+            profilesMenu.addItem(item)
+        }
+    }
+
+    private func profileSelectionMenu(display: DisplayIdentity?) -> NSMenu {
+        let menu = NSMenu(title: display?.name ?? "Default Profile")
+
+        if let display {
+            let useDefaultItem = NSMenuItem(
+                title: "Use Default (\(settingsStore.activeProfile.name))",
+                action: #selector(selectProfileFromMenu(_:)),
+                keyEquivalent: ""
+            )
+            useDefaultItem.target = self
+            useDefaultItem.representedObject = ProfileMenuSelection(
+                profileID: nil,
+                displayID: display.id,
+                displayName: display.name
+            )
+            useDefaultItem.state = settingsStore.profileID(forDisplayID: display.id) == nil ? .on : .off
+            menu.addItem(useDefaultItem)
+            menu.addItem(.separator())
+        }
+
         for profile in settingsStore.profiles {
             let item = NSMenuItem(
                 title: profile.name,
-                action: #selector(switchProfileFromMenu(_:)),
+                action: #selector(selectProfileFromMenu(_:)),
                 keyEquivalent: ""
             )
             item.target = self
-            item.representedObject = profile.id.uuidString
-            item.state = profile.id == settingsStore.activeProfileID ? .on : .off
+            item.representedObject = ProfileMenuSelection(
+                profileID: profile.id,
+                displayID: display?.id,
+                displayName: display?.name
+            )
+            if let display {
+                item.state = profile.id == settingsStore.profileID(forDisplayID: display.id) ? .on : .off
+            } else {
+                item.state = profile.id == settingsStore.activeProfileID ? .on : .off
+            }
             if let shortcut = profile.shortcut {
                 item.toolTip = shortcut.displayName
             }
-            profilesMenu.addItem(item)
+            menu.addItem(item)
         }
+
+        return menu
     }
 
     private func handleSettingsChanged(previewIntent: SettingsWindowController.PreviewIntent) {
@@ -304,14 +354,33 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         settingsWindowController?.showWindow(nil)
     }
 
-    @objc private func switchProfileFromMenu(_ sender: NSMenuItem) {
-        guard let rawID = sender.representedObject as? String,
-              let id = UUID(uuidString: rawID)
-        else {
+    @objc private func selectProfileFromMenu(_ sender: NSMenuItem) {
+        guard let selection = sender.representedObject as? ProfileMenuSelection else {
             return
         }
 
-        switchToProfile(id: id)
+        if let displayID = selection.displayID {
+            settingsStore.setProfile(
+                selection.profileID,
+                forDisplayID: displayID,
+                displayName: selection.displayName ?? "Display"
+            )
+            refreshMenuState()
+            settingsWindowController?.reload()
+            flashGridLayout(selection: .none)
+            return
+        }
+
+        guard let profileID = selection.profileID else {
+            return
+        }
+
+        switchToProfile(id: profileID)
+    }
+
+    @objc private func screenParametersChanged() {
+        refreshMenuState()
+        settingsWindowController?.reload()
     }
 
     @objc private func checkForUpdates(_ sender: Any?) {
@@ -342,7 +411,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             return false
         }
 
-        let settings = settingsStore.settings
+        let settings = settingsStore.settings(forDisplayID: DisplayIdentity(screen: screen).id)
         let frame = screenFrame(for: screen, settings: settings)
         let model = GridModel(settings: settings)
         let selection: GridSelection?
@@ -370,6 +439,18 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
 
     private func screenFrame(for screen: NSScreen, settings: GridSettings) -> CGRect {
         settings.useVisibleFrame ? screen.visibleFrame : screen.frame
+    }
+
+    private final class ProfileMenuSelection {
+        let profileID: UUID?
+        let displayID: String?
+        let displayName: String?
+
+        init(profileID: UUID?, displayID: String?, displayName: String?) {
+            self.profileID = profileID
+            self.displayID = displayID
+            self.displayName = displayName
+        }
     }
 
     @objc private func quit() {
