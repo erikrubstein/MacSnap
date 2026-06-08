@@ -855,36 +855,69 @@ final class WindowSnapper {
             return false
         }
 
-        var position = axPosition(for: rect)
-        var size = rect.size
-
-        guard let positionValue = AXValueCreate(.cgPoint, &position),
-              let sizeValue = AXValueCreate(.cgSize, &size)
-        else {
-            NSLog("MacSnap: Could not create AX values.")
-            return false
+        let positionResult = setPosition(of: window, to: rect)
+        if positionResult == .success {
+            settleWindowServer()
         }
 
-        let positionResult = AXUIElementSetAttributeValue(
-            window,
-            kAXPositionAttribute as CFString,
-            positionValue
-        )
-        let sizeResult = AXUIElementSetAttributeValue(
-            window,
-            kAXSizeAttribute as CFString,
-            sizeValue
-        )
+        var sizeResult = setSize(of: window, to: rect.size)
+        let finalPositionResult = setPosition(of: window, to: rect)
 
-        if positionResult == .success, sizeResult == .success {
+        if let actualRect = self.rect(for: window),
+           !sizesMatch(actualRect.size, rect.size) {
+            NSLog("MacSnap: Snap size mismatch. Expected \(rect.size), got \(actualRect.size). Retrying size.")
+            settleWindowServer()
+            sizeResult = setSize(of: window, to: rect.size)
+            _ = setPosition(of: window, to: rect)
+        }
+
+        if positionResult == .success,
+           sizeResult == .success,
+           finalPositionResult == .success {
             NSLog("MacSnap: Snapped focused window to \(rect).")
             return true
         } else {
             NSLog(
-                "MacSnap: Snap failed. Position AX error \(positionResult.rawValue), size AX error \(sizeResult.rawValue)."
+                "MacSnap: Snap failed. Position AX error \(positionResult.rawValue), final position AX error \(finalPositionResult.rawValue), size AX error \(sizeResult.rawValue)."
             )
             return false
         }
+    }
+
+    private func setPosition(of window: AXUIElement, to rect: CGRect) -> AXError {
+        var position = axPosition(for: rect)
+        guard let positionValue = AXValueCreate(.cgPoint, &position) else {
+            NSLog("MacSnap: Could not create AX position value.")
+            return .failure
+        }
+
+        return AXUIElementSetAttributeValue(
+            window,
+            kAXPositionAttribute as CFString,
+            positionValue
+        )
+    }
+
+    private func setSize(of window: AXUIElement, to size: CGSize) -> AXError {
+        var size = size
+        guard let sizeValue = AXValueCreate(.cgSize, &size) else {
+            NSLog("MacSnap: Could not create AX size value.")
+            return .failure
+        }
+
+        return AXUIElementSetAttributeValue(
+            window,
+            kAXSizeAttribute as CFString,
+            sizeValue
+        )
+    }
+
+    private func settleWindowServer() {
+        RunLoop.current.run(until: Date(timeIntervalSinceNow: 0.03))
+    }
+
+    private func sizesMatch(_ lhs: CGSize, _ rhs: CGSize) -> Bool {
+        abs(lhs.width - rhs.width) < 2 && abs(lhs.height - rhs.height) < 2
     }
 
     private func isResizable(_ window: AXUIElement) -> Bool {
