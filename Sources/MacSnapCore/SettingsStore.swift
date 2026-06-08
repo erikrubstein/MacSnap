@@ -303,6 +303,7 @@ public final class SettingsStore {
         static let profiles = "gridProfiles"
         static let activeProfileID = "activeProfileID"
         static let displayProfileAssignments = "displayProfileAssignments"
+        static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let snapModifier = "snapModifier"
         static let alternateSnapModifier = "alternateSnapModifier"
         static let spanModifier = "spanModifier"
@@ -344,7 +345,12 @@ public final class SettingsStore {
     private let validGapRange = 0...80
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
+        let shouldTreatAsExistingUser = defaults.object(forKey: Key.hasCompletedOnboarding) == nil
+            && hasStoredUserSettings()
         ensureDefaults()
+        if shouldTreatAsExistingUser {
+            defaults.set(true, forKey: Key.hasCompletedOnboarding)
+        }
     }
 
     public var settings: GridSettings {
@@ -722,6 +728,15 @@ public final class SettingsStore {
         }
     }
 
+    public var hasCompletedOnboarding: Bool {
+        get {
+            boolValue(for: Key.hasCompletedOnboarding, fallback: false)
+        }
+        set {
+            defaults.set(newValue, forKey: Key.hasCompletedOnboarding)
+        }
+    }
+
     public var appearance: GridAppearance {
         get {
             guard let data = defaults.data(forKey: Key.gridAppearance),
@@ -760,6 +775,12 @@ public final class SettingsStore {
             saveAppearance(Self.defaultSettings.appearance)
         }
         ensureProfilesExist()
+    }
+
+    private func hasStoredUserSettings() -> Bool {
+        defaults.data(forKey: Key.profiles) != nil ||
+            defaults.object(forKey: Key.activeProfileID) != nil ||
+            defaults.data(forKey: Key.gridAppearance) != nil
     }
 
     private static func fallbackSpanModifier(for snapModifier: SnapModifier) -> SnapModifier {

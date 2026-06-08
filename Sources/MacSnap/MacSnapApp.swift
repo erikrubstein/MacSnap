@@ -13,6 +13,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     private var statusItem: NSStatusItem?
     private var profileHotKeyManager: HotKeyManager?
     private var settingsWindowController: SettingsWindowController?
+    private var onboardingWindowController: OnboardingWindowController?
     private var dragSnapController: DragSnapController?
     private var updaterController: SPUStandardUpdaterController?
     private let snapper = WindowSnapper()
@@ -42,7 +43,11 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             object: nil
         )
         resetAccessibilityPermissionAfterAdHocUpdateIfNeeded()
-        requestAccessibilityPermission()
+        if settingsStore.hasCompletedOnboarding {
+            requestAccessibilityPermission()
+        } else {
+            NSLog("MacSnap: Skipping automatic Accessibility prompt until onboarding reaches permissions.")
+        }
         LaunchAtLoginController.setEnabled(settingsStore.launchAtLogin)
         lastKnownActiveProfileID = settingsStore.activeProfileID
         settingsWindowController = SettingsWindowController(
@@ -74,6 +79,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             NSLog("MacSnap: Sparkle updater is unavailable without packaged app metadata.")
         }
         configureProfileHotkeys()
+        showOnboardingIfNeeded()
     }
 
     func applicationDidBecomeActive(_ notification: Notification) {
@@ -99,6 +105,14 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         )
         settingsItem.target = self
         menu.addItem(settingsItem)
+
+        let setupItem = NSMenuItem(
+            title: "Run Setup...",
+            action: #selector(showOnboarding),
+            keyEquivalent: ""
+        )
+        setupItem.target = self
+        menu.addItem(setupItem)
 
         menu.addItem(.separator())
         let versionItem = NSMenuItem(title: appVersionMenuTitle(), action: nil, keyEquivalent: "")
@@ -352,6 +366,32 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         settingsWindowController?.showWindow(nil)
+    }
+
+    private func showOnboardingIfNeeded() {
+        guard !settingsStore.hasCompletedOnboarding else {
+            return
+        }
+
+        showOnboarding()
+    }
+
+    @objc private func showOnboarding() {
+        onboardingWindowController?.close()
+        let controller = OnboardingWindowController(store: settingsStore) { [weak self] in
+            guard let self else {
+                return
+            }
+
+            lastKnownActiveProfileID = settingsStore.activeProfileID
+            refreshMenuState()
+            configureProfileHotkeys()
+            settingsWindowController?.reload()
+            onboardingWindowController = nil
+        }
+
+        onboardingWindowController = controller
+        controller.showWindow(nil)
     }
 
     @objc private func selectProfileFromMenu(_ sender: NSMenuItem) {

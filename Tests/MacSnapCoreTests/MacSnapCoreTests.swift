@@ -187,6 +187,34 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertTrue(store.launchAtLogin)
     }
 
+    func testOnboardingDefaultsToIncompleteForFreshInstall() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertFalse(store.hasCompletedOnboarding)
+
+        store.hasCompletedOnboarding = true
+        XCTAssertTrue(SettingsStore(defaults: defaults).hasCompletedOnboarding)
+    }
+
+    func testOnboardingIsCompleteForExistingSettingsMigration() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let profilesData = try JSONEncoder().encode([SettingsStore.defaultProfile])
+        defaults.set(profilesData, forKey: "gridProfiles")
+
+        let store = SettingsStore(defaults: defaults)
+        XCTAssertTrue(store.hasCompletedOnboarding)
+    }
+
     func testDisplayProfileAssignmentsPersistAndFallback() throws {
         let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
