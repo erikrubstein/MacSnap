@@ -107,7 +107,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         menu.addItem(settingsItem)
 
         let setupItem = NSMenuItem(
-            title: "Run Setup...",
+            title: "Run Setup",
             action: #selector(showOnboarding),
             keyEquivalent: ""
         )
