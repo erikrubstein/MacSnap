@@ -735,7 +735,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         case Column.gap:
             text = "\(profile.gap)"
         case Column.shortcut:
-            text = profile.shortcut?.displayName ?? "None"
+            text = profile.shortcut?.menuDisplayName ?? "None"
         default:
             text = ""
         }

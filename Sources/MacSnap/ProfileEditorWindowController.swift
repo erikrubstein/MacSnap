@@ -295,7 +295,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
 
         let alert = NSAlert()
         alert.messageText = "Replace Shortcut?"
-        alert.informativeText = "\(normalizedShortcut.displayName) is already assigned to \"\(conflictingProfile.name)\". Replace it?"
+        alert.informativeText = "\(normalizedShortcut.menuDisplayName) is already assigned to \"\(conflictingProfile.name)\". Replace it?"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Replace")
         alert.addButton(withTitle: "Cancel")

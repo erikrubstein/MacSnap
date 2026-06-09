@@ -31,7 +31,7 @@ final class ShortcutRecorderField: NSButton {
 
     func setShortcut(_ shortcut: KeyboardShortcut?) {
         currentShortcut = shortcut
-        title = shortcut?.displayName ?? "None"
+        title = shortcut?.menuDisplayName ?? "None"
     }
 
     @objc private func beginRecording() {
@@ -74,7 +74,7 @@ final class ShortcutRecorderField: NSButton {
         }
 
         currentShortcut = shortcut
-        title = shortcut.displayName
+        title = shortcut.menuDisplayName
         onShortcutRecorded?(shortcut)
         finishRecording()
         window?.makeFirstResponder(nil)

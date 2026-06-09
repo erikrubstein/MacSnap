@@ -288,7 +288,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
                 item.state = profile.id == settingsStore.activeProfileID ? .on : .off
             }
             if let shortcut = profile.shortcut {
-                item.toolTip = shortcut.displayName
+                item.toolTip = shortcut.menuDisplayName
             }
             menu.addItem(item)
         }
