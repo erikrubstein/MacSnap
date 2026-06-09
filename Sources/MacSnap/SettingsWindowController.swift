@@ -13,7 +13,8 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         static let name = NSUserInterfaceItemIdentifier("name")
         static let grid = NSUserInterfaceItemIdentifier("grid")
         static let gap = NSUserInterfaceItemIdentifier("gap")
-        static let shortcut = NSUserInterfaceItemIdentifier("shortcut")
+        static let defaultShortcut = NSUserInterfaceItemIdentifier("defaultShortcut")
+        static let displayShortcut = NSUserInterfaceItemIdentifier("displayShortcut")
     }
 
     private let store: SettingsStore
@@ -30,6 +31,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private let alternateSnapModifierPopup = NSPopUpButton()
     private let spanModifierPopup = NSPopUpButton()
     private let alternateSpanModifierPopup = NSPopUpButton()
+    private let currentDisplayDefaultShortcutField = ShortcutRecorderField()
     private let launchAtLoginSwitch = NSSwitch()
     private let visibleFrameSwitch = NSSwitch()
     private let restoreSizeSwitch = NSSwitch()
@@ -144,9 +146,14 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         stack.addArrangedSubview(permissionSection)
         stack.addArrangedSubview(makeSection(
             title: "Profiles",
-            help: "Create reusable grid layouts. Rows and columns define the grid, gap adds spacing around snapped windows, and shortcut lets you switch profiles from the keyboard. Select a row to edit or delete it.",
+            help: """
+            Create reusable grid layouts. Make Default changes the default profile, while Apply changes only the display under your mouse.
+
+            Apply Default Profile removes the manual assignment from the display under your mouse, so that display goes back to using the default profile.
+            """,
             rows: [
                 makeProfilesTable(),
+                makeCurrentDisplayDefaultShortcutRow(),
                 makeProfileButtonRow()
             ]
         ))
@@ -318,10 +325,11 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         profilesTableView.registerForDraggedTypes([profilePasteboardType])
         profilesTableView.setDraggingSourceOperationMask(.move, forLocal: true)
 
-        addColumn(id: Column.name, title: "Name", width: 250)
-        addColumn(id: Column.grid, title: "Grid", width: 130)
-        addColumn(id: Column.gap, title: "Gap", width: 80)
-        addColumn(id: Column.shortcut, title: "Shortcut", width: 220)
+        addColumn(id: Column.name, title: "Name", width: 190)
+        addColumn(id: Column.grid, title: "Grid", width: 90)
+        addColumn(id: Column.gap, title: "Gap", width: 60)
+        addColumn(id: Column.defaultShortcut, title: "Make Default", width: 165)
+        addColumn(id: Column.displayShortcut, title: "Apply", width: 165)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true
@@ -359,6 +367,35 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         return row
     }
 
+    private func makeCurrentDisplayDefaultShortcutRow() -> NSView {
+        let row = NSStackView()
+        row.orientation = .horizontal
+        row.alignment = .centerY
+        row.spacing = 12
+
+        let labelView = makeSettingLabel("Apply Default Profile")
+
+        currentDisplayDefaultShortcutField.widthAnchor.constraint(equalToConstant: 170).isActive = true
+        currentDisplayDefaultShortcutField.onShortcutRecorded = { [weak self] shortcut in
+            self?.currentDisplayDefaultShortcutRecorded(shortcut)
+        }
+        currentDisplayDefaultShortcutField.onRecordingChanged = { [weak self] isRecording in
+            self?.onShortcutRecordingChanged(isRecording)
+        }
+
+        let clearButton = NSButton(
+            title: "Clear",
+            target: self,
+            action: #selector(clearCurrentDisplayDefaultShortcutClicked)
+        )
+
+        row.addArrangedSubview(labelView)
+        row.addArrangedSubview(currentDisplayDefaultShortcutField)
+        row.addArrangedSubview(clearButton)
+
+        return row
+    }
+
     private func makeDisplayAssignmentsView() -> NSView {
         displayAssignmentsStack.orientation = .vertical
         displayAssignmentsStack.alignment = .leading
@@ -372,7 +409,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         row.alignment = .centerY
         row.spacing = 12
 
-        let labelView = makeSettingLabel("Default Profile")
+        let labelView = makeSettingLabel("Default profile")
 
         let popup = NSPopUpButton()
         for profile in store.profiles {
@@ -403,7 +440,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         let labelView = makeSettingLabel(display.name, tooltip: display.id)
 
         let popup = NSPopUpButton()
-        popup.addItem(withTitle: "Use Default (\(store.activeProfile.name))")
+        popup.addItem(withTitle: "Use default (\(store.activeProfile.name))")
         popup.lastItem?.representedObject = nil
 
         for profile in store.profiles {
@@ -649,6 +686,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         alternateSnapModifierPopup.selectItem(withTitle: settings.alternateSnapModifier?.menuDisplayName ?? "None")
         spanModifierPopup.selectItem(withTitle: settings.spanModifier.menuDisplayName)
         alternateSpanModifierPopup.selectItem(withTitle: settings.alternateSpanModifier?.menuDisplayName ?? "None")
+        currentDisplayDefaultShortcutField.setShortcut(store.currentDisplayDefaultShortcut)
         launchAtLoginSwitch.state = store.launchAtLogin ? .on : .off
         visibleFrameSwitch.state = settings.useVisibleFrame ? .on : .off
         restoreSizeSwitch.state = settings.restoreSizeOnUnsnap ? .on : .off
@@ -734,8 +772,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             text = "\(profile.rows) x \(profile.columns)"
         case Column.gap:
             text = "\(profile.gap)"
-        case Column.shortcut:
-            text = profile.shortcut?.menuDisplayName ?? "None"
+        case Column.defaultShortcut:
+            text = profile.defaultShortcut?.menuDisplayName ?? "None"
+        case Column.displayShortcut:
+            text = profile.displayShortcut?.menuDisplayName ?? "None"
         default:
             text = ""
         }
@@ -846,6 +886,19 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             store.restoreSizeOnUnsnap = restoreSizeOnUnsnap
         }
 
+        refresh()
+        onSettingsChanged(store.settings, .none)
+    }
+
+    private func currentDisplayDefaultShortcutRecorded(_ shortcut: KeyboardShortcut) {
+        store.currentDisplayDefaultShortcut = shortcut.normalized()
+        refresh()
+        onSettingsChanged(store.settings, .none)
+    }
+
+    @objc private func clearCurrentDisplayDefaultShortcutClicked() {
+        store.currentDisplayDefaultShortcut = nil
+        currentDisplayDefaultShortcutField.setShortcut(nil)
         refresh()
         onSettingsChanged(store.settings, .none)
     }

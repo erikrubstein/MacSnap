@@ -225,7 +225,17 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
     public var rows: Int
     public var columns: Int
     public var gap: Int
-    public var shortcut: KeyboardShortcut?
+    public var defaultShortcut: KeyboardShortcut?
+    public var displayShortcut: KeyboardShortcut?
+
+    public var shortcut: KeyboardShortcut? {
+        get {
+            defaultShortcut
+        }
+        set {
+            defaultShortcut = newValue
+        }
+    }
 
     public init(
         id: UUID = UUID(),
@@ -233,14 +243,35 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
         rows: Int,
         columns: Int,
         gap: Int,
-        shortcut: KeyboardShortcut? = nil
+        defaultShortcut: KeyboardShortcut? = nil,
+        displayShortcut: KeyboardShortcut? = nil
     ) {
         self.id = id
         self.name = name
         self.rows = rows
         self.columns = columns
         self.gap = gap
-        self.shortcut = shortcut
+        self.defaultShortcut = defaultShortcut
+        self.displayShortcut = displayShortcut
+    }
+
+    public init(
+        id: UUID = UUID(),
+        name: String,
+        rows: Int,
+        columns: Int,
+        gap: Int,
+        shortcut: KeyboardShortcut?
+    ) {
+        self.init(
+            id: id,
+            name: name,
+            rows: rows,
+            columns: columns,
+            gap: gap,
+            defaultShortcut: shortcut,
+            displayShortcut: nil
+        )
     }
 
     private enum CodingKeys: String, CodingKey {
@@ -249,6 +280,8 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
         case rows
         case columns
         case gap
+        case defaultShortcut
+        case displayShortcut
         case shortcut
         case shortcutDigit
     }
@@ -260,11 +293,13 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
         rows = try container.decode(Int.self, forKey: .rows)
         columns = try container.decode(Int.self, forKey: .columns)
         gap = try container.decode(Int.self, forKey: .gap)
-        shortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .shortcut)
+        defaultShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .defaultShortcut)
+            ?? container.decodeIfPresent(KeyboardShortcut.self, forKey: .shortcut)
+        displayShortcut = try container.decodeIfPresent(KeyboardShortcut.self, forKey: .displayShortcut)
 
-        if shortcut == nil,
+        if defaultShortcut == nil,
            let shortcutDigit = try container.decodeIfPresent(Int.self, forKey: .shortcutDigit) {
-            shortcut = KeyboardShortcut.controlOptionDigit(shortcutDigit)
+            defaultShortcut = KeyboardShortcut.controlOptionDigit(shortcutDigit)
         }
     }
 
@@ -275,7 +310,8 @@ public struct GridProfile: Codable, Equatable, Identifiable, Sendable {
         try container.encode(rows, forKey: .rows)
         try container.encode(columns, forKey: .columns)
         try container.encode(gap, forKey: .gap)
-        try container.encodeIfPresent(shortcut, forKey: .shortcut)
+        try container.encodeIfPresent(defaultShortcut, forKey: .defaultShortcut)
+        try container.encodeIfPresent(displayShortcut, forKey: .displayShortcut)
     }
 }
 
@@ -303,6 +339,7 @@ public final class SettingsStore {
         static let profiles = "gridProfiles"
         static let activeProfileID = "activeProfileID"
         static let displayProfileAssignments = "displayProfileAssignments"
+        static let currentDisplayDefaultShortcut = "currentDisplayDefaultShortcut"
         static let hasCompletedOnboarding = "hasCompletedOnboarding"
         static let snapModifier = "snapModifier"
         static let alternateSnapModifier = "alternateSnapModifier"
@@ -337,12 +374,19 @@ public final class SettingsStore {
         rows: 2,
         columns: 4,
         gap: 0,
-        shortcut: nil
+        defaultShortcut: nil,
+        displayShortcut: nil
     )
 
     private let defaults: UserDefaults
     private let validGridRange = 1...12
     private let validGapRange = 0...80
+
+    private enum ProfileShortcut {
+        case defaultProfile
+        case display
+    }
+
     public init(defaults: UserDefaults = .standard) {
         self.defaults = defaults
         let shouldTreatAsExistingUser = defaults.object(forKey: Key.hasCompletedOnboarding) == nil
@@ -459,6 +503,29 @@ public final class SettingsStore {
         }
     }
 
+    public var currentDisplayDefaultShortcut: KeyboardShortcut? {
+        get {
+            loadShortcut(for: Key.currentDisplayDefaultShortcut)
+        }
+        set {
+            let normalizedShortcut = sanitize(newValue)
+            saveShortcut(normalizedShortcut, for: Key.currentDisplayDefaultShortcut)
+
+            guard let normalizedShortcut else {
+                return
+            }
+
+            var updatedProfiles = profiles
+            removeShortcutConflicts(
+                normalizedShortcut,
+                keepingProfileID: nil,
+                keepingProfileShortcut: nil,
+                in: &updatedProfiles
+            )
+            profiles = updatedProfiles
+        }
+    }
+
     public func displayProfileAssignment(forDisplayID displayID: String) -> DisplayProfileAssignment? {
         displayProfileAssignments.first { $0.displayID == displayID }
     }
@@ -568,13 +635,25 @@ public final class SettingsStore {
         }
 
         updatedProfiles[index] = updatedProfile
+        if updatedProfiles[index].defaultShortcut?.normalized() == updatedProfiles[index].displayShortcut?.normalized() {
+            updatedProfiles[index].displayShortcut = nil
+        }
 
-        if let shortcut = updatedProfile.shortcut {
-            for profileIndex in updatedProfiles.indices where updatedProfiles[profileIndex].id != updatedProfile.id {
-                if updatedProfiles[profileIndex].shortcut == shortcut {
-                    updatedProfiles[profileIndex].shortcut = nil
-                }
-            }
+        if let shortcut = updatedProfiles[index].defaultShortcut?.normalized() {
+            removeShortcutConflicts(
+                shortcut,
+                keepingProfileID: updatedProfile.id,
+                keepingProfileShortcut: .defaultProfile,
+                in: &updatedProfiles
+            )
+        }
+        if let shortcut = updatedProfiles[index].displayShortcut?.normalized() {
+            removeShortcutConflicts(
+                shortcut,
+                keepingProfileID: updatedProfile.id,
+                keepingProfileShortcut: .display,
+                in: &updatedProfiles
+            )
         }
 
         profiles = updatedProfiles
@@ -588,21 +667,22 @@ public final class SettingsStore {
     }
 
     public func setActiveProfileShortcut(_ shortcut: KeyboardShortcut?) {
+        let activeID = activeProfileID
         updateActiveProfile { profile in
-            profile.shortcut = shortcut
+            profile.defaultShortcut = shortcut
         }
 
-        guard let shortcut else {
+        guard let shortcut = sanitize(shortcut) else {
             return
         }
 
-        let activeID = activeProfileID
         var updatedProfiles = profiles
-        for index in updatedProfiles.indices where updatedProfiles[index].id != activeID {
-            if updatedProfiles[index].shortcut == shortcut {
-                updatedProfiles[index].shortcut = nil
-            }
-        }
+        removeShortcutConflicts(
+            shortcut,
+            keepingProfileID: activeID,
+            keepingProfileShortcut: .defaultProfile,
+            in: &updatedProfiles
+        )
         profiles = updatedProfiles
     }
 
@@ -758,6 +838,7 @@ public final class SettingsStore {
         settings = Self.defaultSettings
         launchAtLogin = true
         displayProfileAssignments = []
+        currentDisplayDefaultShortcut = nil
     }
 
     private func ensureDefaults() {
@@ -820,7 +901,8 @@ public final class SettingsStore {
             rows: intValue(for: Key.rows, fallback: Self.defaultSettings.rows, range: validGridRange),
             columns: intValue(for: Key.columns, fallback: Self.defaultSettings.columns, range: validGridRange),
             gap: intValue(for: Key.gap, fallback: Self.defaultSettings.gap, range: validGapRange),
-            shortcut: Self.defaultProfile.shortcut
+            defaultShortcut: Self.defaultProfile.defaultShortcut,
+            displayShortcut: Self.defaultProfile.displayShortcut
         )
 
         saveProfiles([migratedProfile])
@@ -896,6 +978,29 @@ public final class SettingsStore {
         defaults.set(data, forKey: Key.displayProfileAssignments)
     }
 
+    private func loadShortcut(for key: String) -> KeyboardShortcut? {
+        guard let data = defaults.data(forKey: key),
+              let decodedShortcut = try? JSONDecoder().decode(KeyboardShortcut.self, from: data)
+        else {
+            return nil
+        }
+
+        return sanitize(decodedShortcut)
+    }
+
+    private func saveShortcut(_ shortcut: KeyboardShortcut?, for key: String) {
+        guard let shortcut else {
+            defaults.removeObject(forKey: key)
+            return
+        }
+
+        guard let data = try? JSONEncoder().encode(shortcut) else {
+            return
+        }
+
+        defaults.set(data, forKey: key)
+    }
+
     private func sanitizeDisplayProfileAssignments(validProfileIDs: Set<UUID>) {
         let assignments = displayProfileAssignments
         let sanitizedAssignments = sanitize(assignments, validProfileIDs: validProfileIDs)
@@ -932,17 +1037,50 @@ public final class SettingsStore {
             sanitizedProfile.rows = clamp(profile.rows, to: validGridRange)
             sanitizedProfile.columns = clamp(profile.columns, to: validGridRange)
             sanitizedProfile.gap = clamp(profile.gap, to: validGapRange)
-
-            if let shortcut = profile.shortcut?.normalized(),
-               shortcut.keyCode > 0,
-               shortcut.modifiers > 0,
-               !shortcut.displayName.isEmpty {
-                sanitizedProfile.shortcut = shortcut
-            } else {
-                sanitizedProfile.shortcut = nil
+            sanitizedProfile.defaultShortcut = sanitize(profile.defaultShortcut)
+            sanitizedProfile.displayShortcut = sanitize(profile.displayShortcut)
+            if sanitizedProfile.defaultShortcut == sanitizedProfile.displayShortcut {
+                sanitizedProfile.displayShortcut = nil
             }
 
             return sanitizedProfile
+        }
+    }
+
+    private func sanitize(_ shortcut: KeyboardShortcut?) -> KeyboardShortcut? {
+        guard let shortcut = shortcut?.normalized(),
+              shortcut.keyCode > 0,
+              shortcut.modifiers > 0,
+              !shortcut.displayName.isEmpty
+        else {
+            return nil
+        }
+
+        return shortcut
+    }
+
+    private func removeShortcutConflicts(
+        _ shortcut: KeyboardShortcut,
+        keepingProfileID: UUID?,
+        keepingProfileShortcut: ProfileShortcut?,
+        in profiles: inout [GridProfile]
+    ) {
+        for index in profiles.indices {
+            let isKeptProfile = profiles[index].id == keepingProfileID
+
+            if !(isKeptProfile && keepingProfileShortcut == .defaultProfile),
+               profiles[index].defaultShortcut?.normalized() == shortcut {
+                profiles[index].defaultShortcut = nil
+            }
+            if !(isKeptProfile && keepingProfileShortcut == .display),
+               profiles[index].displayShortcut?.normalized() == shortcut {
+                profiles[index].displayShortcut = nil
+            }
+        }
+
+        if keepingProfileShortcut != nil,
+           loadShortcut(for: Key.currentDisplayDefaultShortcut)?.normalized() == shortcut {
+            saveShortcut(nil, for: Key.currentDisplayDefaultShortcut)
         }
     }
 

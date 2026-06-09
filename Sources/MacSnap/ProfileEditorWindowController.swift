@@ -3,18 +3,23 @@ import MacSnapCore
 
 @MainActor
 final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelegate, NSWindowDelegate {
+    private enum ShortcutRole {
+        case defaultProfile
+        case display
+    }
+
     private var profile: GridProfile
     private let profilesProvider: () -> [GridProfile]
     private let overlayController: GridOverlayController
     private let settingsProvider: () -> GridSettings
     private let onShortcutRecordingChanged: (Bool) -> Void
     private let onSave: (GridProfile) -> Void
-    private let labelWidth: CGFloat = 90
+    private let labelWidth: CGFloat = 140
     private let controlSpacing: CGFloat = 12
     private let sliderWidth: CGFloat = 220
     private let valueLabelWidth: CGFloat = 32
     private let textFieldWidth: CGFloat = 250
-    private let buttonRowWidth: CGFloat = 392
+    private let buttonRowWidth: CGFloat = 442
     private let rowHeight: CGFloat = 28
 
     private let nameField = NSTextField()
@@ -24,7 +29,8 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     private let rowsValueLabel = NSTextField(labelWithString: "")
     private let columnsValueLabel = NSTextField(labelWithString: "")
     private let gapValueLabel = NSTextField(labelWithString: "")
-    private let shortcutField = ShortcutRecorderField()
+    private let defaultShortcutField = ShortcutRecorderField()
+    private let displayShortcutField = ShortcutRecorderField()
 
     init(
         profile: GridProfile,
@@ -42,7 +48,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         self.onSave = onSave
 
         let window = NSWindow(
-            contentRect: NSRect(x: 0, y: 0, width: 440, height: 260),
+            contentRect: NSRect(x: 0, y: 0, width: 520, height: 310),
             styleMask: [.titled, .closable],
             backing: .buffered,
             defer: false
@@ -79,7 +85,18 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         stack.addArrangedSubview(makeSliderRow(label: "Rows", slider: rowsSlider, valueLabel: rowsValueLabel, min: 1, max: 12))
         stack.addArrangedSubview(makeSliderRow(label: "Columns", slider: columnsSlider, valueLabel: columnsValueLabel, min: 1, max: 12))
         stack.addArrangedSubview(makeSliderRow(label: "Gap", slider: gapSlider, valueLabel: gapValueLabel, min: 0, max: 80))
-        stack.addArrangedSubview(makeShortcutRow())
+        stack.addArrangedSubview(makeShortcutRow(
+            label: "Make Default",
+            field: defaultShortcutField,
+            role: .defaultProfile,
+            clearAction: #selector(clearDefaultShortcutClicked)
+        ))
+        stack.addArrangedSubview(makeShortcutRow(
+            label: "Apply",
+            field: displayShortcutField,
+            role: .display,
+            clearAction: #selector(clearDisplayShortcutClicked)
+        ))
         stack.setCustomSpacing(24, after: stack.arrangedSubviews.last!)
         stack.addArrangedSubview(makeButtonRow())
 
@@ -151,28 +168,33 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         return row
     }
 
-    private func makeShortcutRow() -> NSView {
+    private func makeShortcutRow(
+        label: String,
+        field: ShortcutRecorderField,
+        role: ShortcutRole,
+        clearAction: Selector
+    ) -> NSView {
         let row = NSStackView()
         row.orientation = .horizontal
         row.alignment = .centerY
         row.spacing = controlSpacing
         row.heightAnchor.constraint(equalToConstant: rowHeight).isActive = true
 
-        let labelView = NSTextField(labelWithString: "Shortcut")
+        let labelView = NSTextField(labelWithString: label)
         labelView.widthAnchor.constraint(equalToConstant: labelWidth).isActive = true
 
-        shortcutField.widthAnchor.constraint(equalToConstant: sliderWidth).isActive = true
-        shortcutField.onShortcutRecorded = { [weak self] shortcut in
-            self?.handleRecordedShortcut(shortcut)
+        field.widthAnchor.constraint(equalToConstant: sliderWidth).isActive = true
+        field.onShortcutRecorded = { [weak self] shortcut in
+            self?.handleRecordedShortcut(shortcut, role: role)
         }
-        shortcutField.onRecordingChanged = { [weak self] isRecording in
+        field.onRecordingChanged = { [weak self] isRecording in
             self?.onShortcutRecordingChanged(isRecording)
         }
 
-        let clearButton = NSButton(title: "Clear", target: self, action: #selector(clearShortcutClicked))
+        let clearButton = NSButton(title: "Clear", target: self, action: clearAction)
 
         row.addArrangedSubview(labelView)
-        row.addArrangedSubview(shortcutField)
+        row.addArrangedSubview(field)
         row.addArrangedSubview(clearButton)
 
         return row
@@ -203,7 +225,8 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         columnsSlider.integerValue = profile.columns
         gapSlider.integerValue = profile.gap
         refreshSliderLabels()
-        shortcutField.setShortcut(profile.shortcut)
+        defaultShortcutField.setShortcut(profile.defaultShortcut)
+        displayShortcutField.setShortcut(profile.displayShortcut)
         showGridOverlay()
     }
 
@@ -256,9 +279,14 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         showGridOverlay()
     }
 
-    @objc private func clearShortcutClicked() {
-        profile.shortcut = nil
-        shortcutField.setShortcut(nil)
+    @objc private func clearDefaultShortcutClicked() {
+        profile.defaultShortcut = nil
+        defaultShortcutField.setShortcut(nil)
+    }
+
+    @objc private func clearDisplayShortcutClicked() {
+        profile.displayShortcut = nil
+        displayShortcutField.setShortcut(nil)
     }
 
     @objc private func cancelClicked() {
@@ -282,29 +310,64 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         window.sheetParent?.endSheet(window)
     }
 
-    private func handleRecordedShortcut(_ shortcut: KeyboardShortcut) {
+    private func handleRecordedShortcut(_ shortcut: KeyboardShortcut, role: ShortcutRole) {
         let normalizedShortcut = shortcut.normalized()
+        if role == .defaultProfile,
+           profile.displayShortcut?.normalized() == normalizedShortcut {
+            profile.displayShortcut = nil
+            displayShortcutField.setShortcut(nil)
+        }
+        if role == .display,
+           profile.defaultShortcut?.normalized() == normalizedShortcut {
+            profile.defaultShortcut = nil
+            defaultShortcutField.setShortcut(nil)
+        }
 
-        guard let conflictingProfile = profilesProvider().first(where: {
-            $0.id != profile.id && $0.shortcut?.normalized() == normalizedShortcut
-        }) else {
-            profile.shortcut = normalizedShortcut
-            shortcutField.setShortcut(normalizedShortcut)
+        guard let conflict = shortcutConflict(for: normalizedShortcut) else {
+            setShortcut(normalizedShortcut, for: role)
             return
         }
 
         let alert = NSAlert()
         alert.messageText = "Replace Shortcut?"
-        alert.informativeText = "\(normalizedShortcut.menuDisplayName) is already assigned to \"\(conflictingProfile.name)\". Replace it?"
+        alert.informativeText = "\(normalizedShortcut.menuDisplayName) is already assigned to \(conflict). Replace it?"
         alert.alertStyle = .warning
         alert.addButton(withTitle: "Replace")
         alert.addButton(withTitle: "Cancel")
 
         if alert.runModal() == .alertFirstButtonReturn {
-            profile.shortcut = normalizedShortcut
-            shortcutField.setShortcut(normalizedShortcut)
+            setShortcut(normalizedShortcut, for: role)
         } else {
-            shortcutField.setShortcut(profile.shortcut)
+            refreshShortcutFields()
         }
+    }
+
+    private func setShortcut(_ shortcut: KeyboardShortcut, for role: ShortcutRole) {
+        switch role {
+        case .defaultProfile:
+            profile.defaultShortcut = shortcut
+            defaultShortcutField.setShortcut(shortcut)
+        case .display:
+            profile.displayShortcut = shortcut
+            displayShortcutField.setShortcut(shortcut)
+        }
+    }
+
+    private func refreshShortcutFields() {
+        defaultShortcutField.setShortcut(profile.defaultShortcut)
+        displayShortcutField.setShortcut(profile.displayShortcut)
+    }
+
+    private func shortcutConflict(for shortcut: KeyboardShortcut) -> String? {
+        for otherProfile in profilesProvider() where otherProfile.id != profile.id {
+            if otherProfile.defaultShortcut?.normalized() == shortcut {
+                return "\"\(otherProfile.name)\" Make Default"
+            }
+            if otherProfile.displayShortcut?.normalized() == shortcut {
+                return "\"\(otherProfile.name)\" Apply"
+            }
+        }
+
+        return nil
     }
 }

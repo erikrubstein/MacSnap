@@ -287,7 +287,8 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             } else {
                 item.state = profile.id == settingsStore.activeProfileID ? .on : .off
             }
-            if let shortcut = profile.shortcut {
+            let shortcut = display == nil ? profile.defaultShortcut : profile.displayShortcut
+            if let shortcut {
                 item.toolTip = shortcut.menuDisplayName
             }
             menu.addItem(item)
@@ -323,21 +324,75 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             profileHotKeyManager?.unregisterAll()
         }
 
-        for profile in settingsStore.profiles {
-            guard let shortcut = profile.shortcut else {
-                continue
-            }
-
+        if let shortcut = settingsStore.currentDisplayDefaultShortcut {
             profileHotKeyManager?.register(
                 keyCode: shortcut.keyCode,
                 modifiers: shortcut.modifiers,
-                label: "Switch to profile '\(profile.name)'"
+                label: "Use default profile on current display"
             ) { [weak self] in
                 Task { @MainActor in
-                    self?.switchToProfile(id: profile.id)
+                    self?.useDefaultProfileOnCurrentDisplay()
                 }
             }
         }
+
+        for profile in settingsStore.profiles {
+            if let shortcut = profile.defaultShortcut {
+                profileHotKeyManager?.register(
+                    keyCode: shortcut.keyCode,
+                    modifiers: shortcut.modifiers,
+                    label: "Switch default profile to '\(profile.name)'"
+                ) { [weak self] in
+                    Task { @MainActor in
+                        self?.switchToProfile(id: profile.id)
+                    }
+                }
+            }
+
+            if let shortcut = profile.displayShortcut {
+                profileHotKeyManager?.register(
+                    keyCode: shortcut.keyCode,
+                    modifiers: shortcut.modifiers,
+                    label: "Switch current display to profile '\(profile.name)'"
+                ) { [weak self] in
+                    Task { @MainActor in
+                        self?.switchCurrentDisplayToProfile(id: profile.id)
+                    }
+                }
+            }
+        }
+    }
+
+    private func switchCurrentDisplayToProfile(id: UUID) {
+        guard let screen = screen(containing: NSEvent.mouseLocation) ?? NSScreen.main else {
+            return
+        }
+
+        let display = DisplayIdentity(screen: screen)
+        settingsStore.setProfile(id, forDisplayID: display.id, displayName: display.name)
+        refreshMenuState()
+        settingsWindowController?.reload()
+        flashGridLayout(selection: .none, displayIDs: [display.id])
+    }
+
+    private func useDefaultProfileOnCurrentDisplay() {
+        guard let screen = screen(containing: NSEvent.mouseLocation) ?? NSScreen.main else {
+            return
+        }
+
+        let display = DisplayIdentity(screen: screen)
+        settingsStore.setProfile(nil, forDisplayID: display.id, displayName: display.name)
+        refreshMenuState()
+        settingsWindowController?.reload()
+        flashGridLayout(selection: .none, displayIDs: [display.id])
+    }
+
+    private func switchToProfile(id: UUID) {
+        settingsStore.activeProfileID = id
+        lastKnownActiveProfileID = settingsStore.activeProfileID
+        refreshMenuState()
+        settingsWindowController?.reload()
+        flashGridLayout(selection: .none, displayIDs: displayIDsUsingDefaultProfile())
     }
 
     private func setProfileHotkeysSuspended(_ isSuspended: Bool) {
@@ -351,14 +406,6 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         } else {
             configureProfileHotkeys()
         }
-    }
-
-    private func switchToProfile(id: UUID) {
-        settingsStore.activeProfileID = id
-        lastKnownActiveProfileID = settingsStore.activeProfileID
-        refreshMenuState()
-        settingsWindowController?.reload()
-        flashGridLayout(selection: .none, displayIDs: displayIDsUsingDefaultProfile())
     }
 
     @objc private func showSettings() {

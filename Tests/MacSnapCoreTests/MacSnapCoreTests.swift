@@ -115,6 +115,9 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertEqual(store.profiles.count, 1)
         XCTAssertEqual(store.activeProfile.name, "Default")
         XCTAssertNil(store.activeProfile.shortcut)
+        XCTAssertNil(store.activeProfile.defaultShortcut)
+        XCTAssertNil(store.activeProfile.displayShortcut)
+        XCTAssertNil(store.currentDisplayDefaultShortcut)
 
         store.rows = 3
         store.columns = 5
@@ -129,6 +132,8 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertEqual(workProfile.columns, 5)
         XCTAssertEqual(workProfile.gap, 12)
         XCTAssertEqual(workProfile.shortcut, shortcut.normalized())
+        XCTAssertEqual(workProfile.defaultShortcut, shortcut.normalized())
+        XCTAssertNil(workProfile.displayShortcut)
 
         let secondProfile = store.addProfile()
         XCTAssertEqual(store.activeProfileID, secondProfile.id)
@@ -140,6 +145,35 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertEqual(store.rows, 3)
         store.activeProfileID = secondProfile.id
         XCTAssertEqual(store.rows, 1)
+    }
+
+    func testProfileShortcutRolesAndCurrentDisplayDefaultShortcut() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        let defaultShortcut = KeyboardShortcut(keyCode: 18, modifiers: 768, displayName: "Command+Shift+1")
+        let displayShortcut = KeyboardShortcut(keyCode: 19, modifiers: 768, displayName: "Command+Shift+2")
+        let resetDisplayShortcut = KeyboardShortcut(keyCode: 20, modifiers: 768, displayName: "Command+Shift+3")
+
+        var profile = store.activeProfile
+        profile.defaultShortcut = defaultShortcut
+        profile.displayShortcut = displayShortcut
+        store.updateProfile(profile)
+
+        XCTAssertEqual(store.activeProfile.defaultShortcut, defaultShortcut.normalized())
+        XCTAssertEqual(store.activeProfile.displayShortcut, displayShortcut.normalized())
+
+        store.currentDisplayDefaultShortcut = resetDisplayShortcut
+        XCTAssertEqual(store.currentDisplayDefaultShortcut, resetDisplayShortcut.normalized())
+
+        store.currentDisplayDefaultShortcut = defaultShortcut
+        XCTAssertEqual(store.currentDisplayDefaultShortcut, defaultShortcut.normalized())
+        XCTAssertNil(store.activeProfile.defaultShortcut)
+        XCTAssertEqual(store.activeProfile.displayShortcut, displayShortcut.normalized())
     }
 
     func testOptionalModifierStorage() throws {
