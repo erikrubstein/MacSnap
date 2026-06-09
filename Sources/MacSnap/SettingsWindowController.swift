@@ -6,7 +6,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     enum PreviewIntent {
         case none
         case sampleCell
-        case profileSwitch
+        case affectedDisplays(Set<String>)
     }
 
     private enum Column {
@@ -700,6 +700,21 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
     }
 
+    private func displayIDsUsingDefaultProfile() -> Set<String> {
+        Set(NSScreen.screens.compactMap { screen in
+            let display = DisplayIdentity(screen: screen)
+            return store.profileID(forDisplayID: display.id) == nil ? display.id : nil
+        })
+    }
+
+    private func displayIDs(usingProfileID profileID: UUID) -> Set<String> {
+        Set(NSScreen.screens.compactMap { screen in
+            let display = DisplayIdentity(screen: screen)
+            let effectiveProfileID = store.profileID(forDisplayID: display.id) ?? store.activeProfileID
+            return effectiveProfileID == profileID ? display.id : nil
+        })
+    }
+
     func numberOfRows(in tableView: NSTableView) -> Int {
         store.profiles.count
     }
@@ -776,9 +791,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             return
         }
 
+        let affectedDisplayIDs = displayIDs(usingProfileID: selectedProfile.id)
         store.deleteProfile(id: selectedProfile.id)
         refresh()
-        onSettingsChanged(store.settings, .profileSwitch)
+        onSettingsChanged(store.settings, .affectedDisplays(affectedDisplayIDs))
     }
 
     private func showEditor(for profile: GridProfile) {
@@ -903,8 +919,9 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
 
         store.activeProfileID = profileID
+        let affectedDisplayIDs = displayIDsUsingDefaultProfile()
         refresh()
-        onSettingsChanged(store.settings, .profileSwitch)
+        onSettingsChanged(store.settings, .affectedDisplays(affectedDisplayIDs))
     }
 
     @objc private func displayAssignmentChanged(_ sender: NSPopUpButton) {
@@ -915,9 +932,13 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         }
 
         let profileID = (sender.selectedItem?.representedObject as? String).flatMap(UUID.init(uuidString:))
+        let previousProfileID = store.profileID(forDisplayID: display.id)
         store.setProfile(profileID, forDisplayID: display.id, displayName: display.name)
         refresh()
-        onSettingsChanged(store.settings, .none)
+        let previewIntent: PreviewIntent = previousProfileID == profileID
+            ? .none
+            : .affectedDisplays([display.id])
+        onSettingsChanged(store.settings, previewIntent)
     }
 
     @objc private func colorWellChanged(_ sender: NSColorWell) {

@@ -297,20 +297,16 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     }
 
     private func handleSettingsChanged(previewIntent: SettingsWindowController.PreviewIntent) {
-        let activeProfileID = settingsStore.activeProfileID
-        let didSwitchProfile = lastKnownActiveProfileID != nil
-            && lastKnownActiveProfileID != activeProfileID
-
-        lastKnownActiveProfileID = activeProfileID
+        lastKnownActiveProfileID = settingsStore.activeProfileID
         refreshMenuState()
         configureProfileHotkeys()
 
         switch previewIntent {
         case .sampleCell:
             flashGridLayout(selection: .sampleCell)
-        case .profileSwitch where didSwitchProfile:
-            flashGridLayout(selection: .none)
-        case .profileSwitch, .none:
+        case .affectedDisplays(let displayIDs):
+            flashGridLayout(selection: .none, displayIDs: displayIDs)
+        case .none:
             break
         }
     }
@@ -362,7 +358,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         lastKnownActiveProfileID = settingsStore.activeProfileID
         refreshMenuState()
         settingsWindowController?.reload()
-        flashGridLayout(selection: .none)
+        flashGridLayout(selection: .none, displayIDs: displayIDsUsingDefaultProfile())
     }
 
     @objc private func showSettings() {
@@ -411,7 +407,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             )
             refreshMenuState()
             settingsWindowController?.reload()
-            flashGridLayout(selection: .none)
+            flashGridLayout(selection: .none, displayIDs: [displayID])
             return
         }
 
@@ -431,9 +427,12 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         updaterController?.checkForUpdates(sender)
     }
 
-    private func flashGridLayout(selection: OverlaySelectionMode) {
+    private func flashGridLayout(selection: OverlaySelectionMode, displayIDs: Set<String>? = nil) {
         flashTimer?.invalidate()
-        _ = showCurrentGridOverlay(selection: selection)
+        guard showGridOverlays(selection: selection, displayIDs: displayIDs) else {
+            return
+        }
+
         flashTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
             Task { @MainActor in
                 self?.overlayController.hide()
@@ -448,13 +447,35 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
     }
 
     @discardableResult
-    private func showCurrentGridOverlay(selection selectionMode: OverlaySelectionMode) -> Bool {
+    private func showGridOverlays(selection selectionMode: OverlaySelectionMode, displayIDs: Set<String>?) -> Bool {
+        if let displayIDs {
+            let screens = NSScreen.screens.filter { displayIDs.contains(DisplayIdentity(screen: $0).id) }
+            guard !screens.isEmpty else {
+                overlayController.hide()
+                return false
+            }
+
+            for (index, screen) in screens.enumerated() {
+                showGridOverlay(on: screen, selection: selectionMode, replacingExisting: index == 0)
+            }
+            return true
+        }
+
         let mouseLocation = NSEvent.mouseLocation
         guard let screen = screen(containing: mouseLocation) ?? NSScreen.main else {
             overlayController.hide()
             return false
         }
 
+        showGridOverlay(on: screen, selection: selectionMode, replacingExisting: true)
+        return true
+    }
+
+    private func showGridOverlay(
+        on screen: NSScreen,
+        selection selectionMode: OverlaySelectionMode,
+        replacingExisting: Bool
+    ) {
         let settings = settingsStore.settings(forDisplayID: DisplayIdentity(screen: screen).id)
         let frame = screenFrame(for: screen, settings: settings)
         let model = GridModel(settings: settings)
@@ -470,9 +491,16 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
             model: model,
             selection: selection,
             appearance: settings.appearance,
-            in: frame
+            in: frame,
+            replacingExisting: replacingExisting
         )
-        return true
+    }
+
+    private func displayIDsUsingDefaultProfile() -> Set<String> {
+        Set(NSScreen.screens.compactMap { screen in
+            let display = DisplayIdentity(screen: screen)
+            return settingsStore.profileID(forDisplayID: display.id) == nil ? display.id : nil
+        })
     }
 
     private func screen(containing point: CGPoint) -> NSScreen? {

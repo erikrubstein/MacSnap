@@ -6,11 +6,15 @@ final class GridOverlayController {
     static let overlayLevel = NSWindow.Level.statusBar
     static let appWindowLevel = NSWindow.Level(rawValue: NSWindow.Level.statusBar.rawValue + 1)
 
-    private var window: NSWindow?
-    private var overlayView: GridOverlayView?
+    private struct OverlayPresentation {
+        var window: NSWindow
+        var view: GridOverlayView
+    }
+
+    private var overlays: [String: OverlayPresentation] = [:]
 
     var isVisible: Bool {
-        window?.isVisible == true
+        overlays.values.contains { $0.window.isVisible }
     }
 
     func show(
@@ -18,22 +22,30 @@ final class GridOverlayController {
         model: GridModel,
         selection: GridSelection?,
         appearance: GridAppearance,
-        in screenFrame: CGRect? = nil
+        in screenFrame: CGRect? = nil,
+        replacingExisting: Bool = true
     ) {
-        if window == nil || overlayView == nil {
-            makeWindow()
+        let screenID = DisplayIdentity(screen: screen).id
+
+        if replacingExisting {
+            hide(except: screenID)
         }
 
-        guard let window, let overlayView else {
+        if overlays[screenID] == nil {
+            overlays[screenID] = makeOverlay()
+        }
+
+        guard let overlay = overlays[screenID] else {
             return
         }
 
+        let window = overlay.window
         let frame = screenFrame ?? screen.visibleFrame
         if window.frame != frame {
             window.setFrame(frame, display: true)
         }
 
-        overlayView.configure(screenFrame: frame, model: model, selection: selection, appearance: appearance)
+        overlay.view.configure(screenFrame: frame, model: model, selection: selection, appearance: appearance)
 
         if !window.isVisible {
             window.alphaValue = 0
@@ -51,20 +63,53 @@ final class GridOverlayController {
         model: GridModel,
         selection: GridSelection?,
         appearance: GridAppearance,
-        in screenFrame: CGRect? = nil
+        in screenFrame: CGRect? = nil,
+        replacingExisting: Bool = true
     ) {
         guard isVisible else {
-            show(on: screen, model: model, selection: selection, appearance: appearance, in: screenFrame)
+            show(
+                on: screen,
+                model: model,
+                selection: selection,
+                appearance: appearance,
+                in: screenFrame,
+                replacingExisting: replacingExisting
+            )
             return
         }
 
-        show(on: screen, model: model, selection: selection, appearance: appearance, in: screenFrame)
+        show(
+            on: screen,
+            model: model,
+            selection: selection,
+            appearance: appearance,
+            in: screenFrame,
+            replacingExisting: replacingExisting
+        )
     }
 
     func hide() {
-        guard let window, window.isVisible else {
+        hide(except: nil)
+    }
+
+    private func hide(except retainedScreenID: String?) {
+        let hiddenScreenIDs = overlays.keys.filter { $0 != retainedScreenID }
+        guard !hiddenScreenIDs.isEmpty else {
             return
         }
+
+        for screenID in hiddenScreenIDs {
+            guard let window = overlays[screenID]?.window, window.isVisible else {
+                overlays[screenID] = nil
+                continue
+            }
+
+            hide(window: window, screenID: screenID)
+        }
+    }
+
+    private func hide(window: NSWindow, screenID: String) {
+        overlays[screenID] = nil
 
         NSAnimationContext.runAnimationGroup { context in
             context.duration = 0.10
@@ -78,7 +123,7 @@ final class GridOverlayController {
         }
     }
 
-    private func makeWindow() {
+    private func makeOverlay() -> OverlayPresentation {
         let view = GridOverlayView()
         let panel = NSPanel(
             contentRect: .zero,
@@ -97,8 +142,7 @@ final class GridOverlayController {
         panel.level = Self.overlayLevel
         panel.animationBehavior = .none
 
-        window = panel
-        overlayView = view
+        return OverlayPresentation(window: panel, view: view)
     }
 }
 
