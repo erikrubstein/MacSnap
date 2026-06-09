@@ -450,7 +450,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     }
 
     private var optionalModifierTitles: [String] {
-        ["None"] + SnapModifier.allCases.map(\.displayName)
+        ["None"] + SnapModifier.allCases.map(\.menuDisplayName)
     }
 
     private func makeModifierRow() -> NSView {
@@ -462,7 +462,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         let labelView = makeSettingLabel("Snap modifier")
 
         snapModifierPopup.removeAllItems()
-        snapModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
+        snapModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.menuDisplayName))
         snapModifierPopup.target = self
         snapModifierPopup.action = #selector(snapModifierChanged)
         snapModifierPopup.widthAnchor.constraint(equalToConstant: 160).isActive = true
@@ -502,7 +502,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         let labelView = makeSettingLabel("Span modifier")
 
         spanModifierPopup.removeAllItems()
-        spanModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
+        spanModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.menuDisplayName))
         spanModifierPopup.target = self
         spanModifierPopup.action = #selector(spanModifierChanged)
         spanModifierPopup.widthAnchor.constraint(equalToConstant: 160).isActive = true
@@ -645,10 +645,10 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
 
         editProfileButton.isEnabled = selectedProfile != nil
         deleteProfileButton.isEnabled = store.profiles.count > 1 && selectedProfile != nil
-        snapModifierPopup.selectItem(withTitle: settings.snapModifier.displayName)
-        alternateSnapModifierPopup.selectItem(withTitle: settings.alternateSnapModifier?.displayName ?? "None")
-        spanModifierPopup.selectItem(withTitle: settings.spanModifier.displayName)
-        alternateSpanModifierPopup.selectItem(withTitle: settings.alternateSpanModifier?.displayName ?? "None")
+        snapModifierPopup.selectItem(withTitle: settings.snapModifier.menuDisplayName)
+        alternateSnapModifierPopup.selectItem(withTitle: settings.alternateSnapModifier?.menuDisplayName ?? "None")
+        spanModifierPopup.selectItem(withTitle: settings.spanModifier.menuDisplayName)
+        alternateSpanModifierPopup.selectItem(withTitle: settings.alternateSpanModifier?.menuDisplayName ?? "None")
         launchAtLoginSwitch.state = store.launchAtLogin ? .on : .off
         visibleFrameSwitch.state = settings.useVisibleFrame ? .on : .off
         restoreSizeSwitch.state = settings.restoreSizeOnUnsnap ? .on : .off

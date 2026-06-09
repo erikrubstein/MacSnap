@@ -149,12 +149,12 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func configureControls() {
-        snapModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
+        snapModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.menuDisplayName))
         snapModifierPopup.target = self
         snapModifierPopup.action = #selector(snapModifierChanged)
         snapModifierPopup.widthAnchor.constraint(equalToConstant: 170).isActive = true
 
-        spanModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.displayName))
+        spanModifierPopup.addItems(withTitles: SnapModifier.allCases.map(\.menuDisplayName))
         spanModifierPopup.target = self
         spanModifierPopup.action = #selector(spanModifierChanged)
         spanModifierPopup.widthAnchor.constraint(equalToConstant: 170).isActive = true
@@ -387,8 +387,8 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
     }
 
     private func refreshModifierPopups() {
-        snapModifierPopup.selectItem(withTitle: draftSnapModifier.displayName)
-        spanModifierPopup.selectItem(withTitle: draftSpanModifier.displayName)
+        snapModifierPopup.selectItem(withTitle: draftSnapModifier.menuDisplayName)
+        spanModifierPopup.selectItem(withTitle: draftSpanModifier.menuDisplayName)
     }
 
     private func refreshProfileLabels() {
