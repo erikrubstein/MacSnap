@@ -147,9 +147,11 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         stack.addArrangedSubview(makeSection(
             title: "Profiles",
             help: """
-            Create reusable grid layouts. Make Default changes the default profile, while Apply changes only the display under your mouse.
+            Profiles are reusable grid layouts. Rows and columns define the grid, and gap adds spacing around snapped windows.
 
-            Apply Default Profile removes the manual assignment from the display under your mouse, so that display goes back to using the default profile.
+            Optional shortcuts can be set for each profile. "Make Default" makes that profile the new default profile, while "Apply" applies that profile to the current display.
+
+            "Apply Default Profile" removes the manual assignment from the display under your mouse, so that display goes back to using the default profile.
             """,
             rows: [
                 makeProfilesTable(),
@@ -159,7 +161,11 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         ))
         stack.addArrangedSubview(makeSection(
             title: "Displays",
-            help: "Choose the default profile used everywhere, then assign different profiles to connected displays when you want each screen to use its own grid.",
+            help: """
+            The default profile is used by any display that is set to "Use default".
+
+            You can assign a specific profile to a display when that display needs its own grid. That assignment stays remembered for the display, even if you unplug it and reconnect it later.
+            """,
             rows: [
                 makeDisplayAssignmentsView()
             ]
