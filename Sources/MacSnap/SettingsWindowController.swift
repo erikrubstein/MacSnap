@@ -753,6 +753,14 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         })
     }
 
+    private func screens(usingProfileID profileID: UUID) -> [NSScreen] {
+        NSScreen.screens.filter { screen in
+            let display = DisplayIdentity(screen: screen)
+            let effectiveProfileID = store.profileID(forDisplayID: display.id) ?? store.activeProfileID
+            return effectiveProfileID == profileID
+        }
+    }
+
     func numberOfRows(in tableView: NSTableView) -> Int {
         store.profiles.count
     }
@@ -847,6 +855,9 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             settingsProvider: { [weak self] in
                 self?.store.settings ?? SettingsStore.defaultSettings
             },
+            affectedScreensProvider: { [weak self] profileID in
+                self?.screens(usingProfileID: profileID) ?? []
+            },
             onShortcutRecordingChanged: onShortcutRecordingChanged
         ) { [weak self] updatedProfile in
             guard let self else {
@@ -861,9 +872,6 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         profileEditorWindowController = editor
         window?.beginSheet(editor.window!) { [weak self] _ in
             self?.profileEditorWindowController = nil
-        }
-        DispatchQueue.main.async { [weak editor] in
-            editor?.showGridOverlay()
         }
     }
 

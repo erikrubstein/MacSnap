@@ -12,6 +12,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     private let profilesProvider: () -> [GridProfile]
     private let overlayController: GridOverlayController
     private let settingsProvider: () -> GridSettings
+    private let affectedScreensProvider: (UUID) -> [NSScreen]
     private let onShortcutRecordingChanged: (Bool) -> Void
     private let onSave: (GridProfile) -> Void
     private let labelWidth: CGFloat = 140
@@ -31,12 +32,14 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     private let gapValueLabel = NSTextField(labelWithString: "")
     private let defaultShortcutField = ShortcutRecorderField()
     private let displayShortcutField = ShortcutRecorderField()
+    private var previewHideTimer: Timer?
 
     init(
         profile: GridProfile,
         profilesProvider: @escaping () -> [GridProfile],
         overlayController: GridOverlayController,
         settingsProvider: @escaping () -> GridSettings,
+        affectedScreensProvider: @escaping (UUID) -> [NSScreen],
         onShortcutRecordingChanged: @escaping (Bool) -> Void,
         onSave: @escaping (GridProfile) -> Void
     ) {
@@ -44,6 +47,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         self.profilesProvider = profilesProvider
         self.overlayController = overlayController
         self.settingsProvider = settingsProvider
+        self.affectedScreensProvider = affectedScreensProvider
         self.onShortcutRecordingChanged = onShortcutRecordingChanged
         self.onSave = onSave
 
@@ -69,6 +73,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
     }
 
     func windowWillClose(_ notification: Notification) {
+        previewHideTimer?.invalidate()
         overlayController.hide()
     }
 
@@ -227,7 +232,6 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         refreshSliderLabels()
         defaultShortcutField.setShortcut(profile.defaultShortcut)
         displayShortcutField.setShortcut(profile.displayShortcut)
-        showGridOverlay()
     }
 
     private func syncFromFields() {
@@ -244,9 +248,10 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         gapValueLabel.stringValue = "\(gapSlider.integerValue)"
     }
 
-    func showGridOverlay() {
-        let screen = window?.sheetParent?.screen ?? window?.screen ?? NSScreen.main
-        guard let screen else {
+    private func showGridOverlay() {
+        let screens = affectedScreensProvider(profile.id)
+        guard !screens.isEmpty else {
+            overlayController.hide()
             return
         }
 
@@ -263,15 +268,26 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
             restoreSizeOnUnsnap: baseSettings.restoreSizeOnUnsnap,
             appearance: baseSettings.appearance
         )
-        let frame = settings.useVisibleFrame ? screen.visibleFrame : screen.frame
 
-        overlayController.update(
-            on: screen,
-            model: GridModel(settings: settings),
-            selection: nil,
-            appearance: settings.appearance,
-            in: frame
-        )
+        for (index, screen) in screens.enumerated() {
+            let frame = settings.useVisibleFrame ? screen.visibleFrame : screen.frame
+            overlayController.update(
+                on: screen,
+                model: GridModel(settings: settings),
+                selection: nil,
+                appearance: settings.appearance,
+                in: frame,
+                replacingExisting: index == 0
+            )
+        }
+
+        previewHideTimer?.invalidate()
+        previewHideTimer = Timer.scheduledTimer(withTimeInterval: 0.45, repeats: false) { [weak self] _ in
+            Task { @MainActor in
+                self?.overlayController.hide()
+                self?.previewHideTimer = nil
+            }
+        }
     }
 
     @objc private func sliderChanged(_ sender: NSSlider) {
@@ -301,6 +317,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
 
     private func closeSheet() {
         onShortcutRecordingChanged(false)
+        previewHideTimer?.invalidate()
         overlayController.hide()
 
         guard let window else {
