@@ -117,8 +117,23 @@ copy_dmg_background() {
 
 sign_app_bundle() {
   echo "Signing $APP_NAME.app with identity: $CODE_SIGN_IDENTITY"
-  codesign --force --deep --sign "$CODE_SIGN_IDENTITY" "$APP_BUNDLE"
+  codesign_args=(--force --deep --sign "$CODE_SIGN_IDENTITY")
+  if [[ "$CODE_SIGN_IDENTITY" != "-" ]]; then
+    codesign_args+=(--options runtime --timestamp)
+  fi
+
+  codesign "${codesign_args[@]}" "$APP_BUNDLE"
   codesign --verify --deep --strict --verbose=2 "$APP_BUNDLE"
+}
+
+sign_dmg() {
+  if [[ "$CODE_SIGN_IDENTITY" == "-" ]]; then
+    return
+  fi
+
+  echo "Signing $APP_NAME DMG with identity: $CODE_SIGN_IDENTITY"
+  codesign --force --sign "$CODE_SIGN_IDENTITY" --timestamp "$DMG_PATH"
+  codesign --verify --verbose=2 "$DMG_PATH"
 }
 
 set_dmg_finder_layout() {
@@ -313,6 +328,7 @@ hdiutil detach "$device" -quiet
 device=""
 
 hdiutil convert "$RW_DMG_PATH" -format UDZO -imagekey zlib-level=9 -ov -o "$DMG_PATH" >/dev/null
+sign_dmg
 
 echo "Created $DMG_PATH"
 file "$APP_MACOS/$APP_NAME"
