@@ -32,6 +32,9 @@ final class ShortcutRecorderField: NSButton {
     func setShortcut(_ shortcut: KeyboardShortcut?) {
         currentShortcut = shortcut
         title = shortcut?.menuDisplayName ?? "None"
+        if isRecording {
+            finishRecording(clearFirstResponder: true)
+        }
     }
 
     @objc private func beginRecording() {
@@ -59,6 +62,11 @@ final class ShortcutRecorderField: NSButton {
             return
         }
 
+        if Int(event.keyCode) == kVK_Escape {
+            cancelRecording(clearFirstResponder: true)
+            return
+        }
+
         let shortcut = KeyboardShortcut(
             keyCode: UInt32(event.keyCode),
             modifiers: carbonModifiers(from: event.modifierFlags),
@@ -75,20 +83,27 @@ final class ShortcutRecorderField: NSButton {
 
         currentShortcut = shortcut
         title = shortcut.menuDisplayName
+        finishRecording(clearFirstResponder: false)
         onShortcutRecorded?(shortcut)
-        finishRecording()
         window?.makeFirstResponder(nil)
     }
 
-    private func cancelRecording() {
-        isRecording = false
-        setShortcut(currentShortcut)
-        onRecordingChanged?(false)
+    private func cancelRecording(clearFirstResponder: Bool = false) {
+        let shortcut = currentShortcut
+        title = shortcut?.menuDisplayName ?? "None"
+        finishRecording(clearFirstResponder: clearFirstResponder)
     }
 
-    private func finishRecording() {
+    private func finishRecording(clearFirstResponder: Bool = false) {
+        guard isRecording else {
+            return
+        }
+
         isRecording = false
         onRecordingChanged?(false)
+        if clearFirstResponder, window?.firstResponder === self {
+            window?.makeFirstResponder(nil)
+        }
     }
 
     private func carbonModifiers(from flags: NSEvent.ModifierFlags) -> UInt32 {
