@@ -274,7 +274,7 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
             overlayController.update(
                 on: screen,
                 model: GridModel(settings: settings),
-                selection: nil,
+                selection: GridSelection(cell: GridCell(row: 0, column: 0)),
                 appearance: settings.appearance,
                 in: frame,
                 replacingExisting: index == 0

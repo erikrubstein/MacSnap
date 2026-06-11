@@ -485,7 +485,7 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         case .none:
             selection = nil
         case .sampleCell:
-            selection = GridSelection(cell: GridCell(row: settings.rows / 2, column: settings.columns / 2))
+            selection = GridSelection(cell: GridCell(row: 0, column: 0))
         }
         overlayController.update(
             on: screen,

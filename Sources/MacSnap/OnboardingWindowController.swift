@@ -432,7 +432,7 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         overlayController.update(
             on: screen,
             model: GridModel(settings: settings),
-            selection: nil,
+            selection: GridSelection(cell: GridCell(row: 0, column: 0)),
             appearance: settings.appearance,
             in: frame
         )
