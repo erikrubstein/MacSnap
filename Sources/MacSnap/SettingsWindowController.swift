@@ -46,6 +46,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     private var displayAssignmentPopups: [NSPopUpButton: DisplayIdentity] = [:]
     private var helpPopover: NSPopover?
     private var profileEditorWindowController: ProfileEditorWindowController?
+    private var resetDefaultsWindowController: ResetDefaultsWindowController?
 
     init(
         store: SettingsStore,
@@ -1028,10 +1029,23 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
     }
 
     @objc private func resetClicked() {
-        store.reset()
-        onLaunchAtLoginChanged(store.launchAtLogin)
-        refresh()
-        onSettingsChanged(store.settings, .none)
+        let controller = ResetDefaultsWindowController { [weak self] sections in
+            guard let self else {
+                return
+            }
+
+            store.reset(sections)
+            if sections.contains(.global) {
+                onLaunchAtLoginChanged(store.launchAtLogin)
+            }
+            refresh()
+            onSettingsChanged(store.settings, .none)
+        }
+
+        resetDefaultsWindowController = controller
+        window?.beginSheet(controller.window!) { [weak self] _ in
+            self?.resetDefaultsWindowController = nil
+        }
     }
 
     func tableView(_ tableView: NSTableView, pasteboardWriterForRow row: Int) -> NSPasteboardWriting? {

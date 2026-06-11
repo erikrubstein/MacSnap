@@ -332,6 +332,13 @@ public struct DisplayProfileAssignment: Codable, Equatable, Identifiable, Sendab
 }
 
 public final class SettingsStore {
+    public enum ResetSection: Hashable {
+        case profiles
+        case displays
+        case global
+        case appearance
+    }
+
     private enum Key {
         static let rows = "gridRows"
         static let columns = "gridColumns"
@@ -832,12 +839,33 @@ public final class SettingsStore {
     }
 
     public func reset() {
-        profiles = [Self.defaultProfile]
-        activeProfileID = Self.defaultProfile.id
-        settings = Self.defaultSettings
-        launchAtLogin = true
-        displayProfileAssignments = []
-        currentDisplayDefaultShortcut = nil
+        reset([.profiles, .displays, .global, .appearance])
+    }
+
+    public func reset(_ sections: Set<ResetSection>) {
+        if sections.contains(.profiles) {
+            profiles = [Self.defaultProfile]
+            activeProfileID = Self.defaultProfile.id
+            currentDisplayDefaultShortcut = nil
+        }
+
+        if sections.contains(.displays) {
+            displayProfileAssignments = []
+        }
+
+        if sections.contains(.global) {
+            snapModifier = Self.defaultSettings.snapModifier
+            spanModifier = Self.defaultSettings.spanModifier
+            alternateSnapModifier = Self.defaultSettings.alternateSnapModifier
+            alternateSpanModifier = Self.defaultSettings.alternateSpanModifier
+            useVisibleFrame = Self.defaultSettings.useVisibleFrame
+            restoreSizeOnUnsnap = Self.defaultSettings.restoreSizeOnUnsnap
+            launchAtLogin = true
+        }
+
+        if sections.contains(.appearance) {
+            appearance = Self.defaultSettings.appearance
+        }
     }
 
     private func ensureDefaults() {

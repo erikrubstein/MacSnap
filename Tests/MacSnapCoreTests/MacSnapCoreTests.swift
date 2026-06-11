@@ -222,6 +222,66 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertTrue(store.launchAtLogin)
     }
 
+    func testScopedResetOnlyResetsSelectedSections() throws {
+        let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
+        let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
+        defer {
+            defaults.removePersistentDomain(forName: suiteName)
+        }
+
+        let store = SettingsStore(defaults: defaults)
+        store.rows = 3
+        store.columns = 5
+        store.gap = 12
+        store.renameActiveProfile("Custom")
+        store.currentDisplayDefaultShortcut = KeyboardShortcut(
+            keyCode: 18,
+            modifiers: 768,
+            displayName: "Command+Shift+1"
+        )
+
+        var externalProfile = store.addProfile()
+        externalProfile.name = "External"
+        externalProfile.columns = 6
+        store.updateProfile(externalProfile)
+        store.setProfile(externalProfile.id, forDisplayID: "external-display", displayName: "External Display")
+
+        store.snapModifier = .control
+        store.spanModifier = .option
+        store.alternateSnapModifier = .shift
+        store.launchAtLogin = false
+        store.useVisibleFrame = false
+        store.restoreSizeOnUnsnap = false
+        store.appearance = GridAppearance(
+            backgroundColor: GridColor(red: 0.2, green: 0.3, blue: 0.4, alpha: 0.5),
+            gridLineColor: GridColor(red: 0.5, green: 0.6, blue: 0.7, alpha: 0.8),
+            selectionColor: GridColor(red: 0.7, green: 0.6, blue: 0.5, alpha: 0.4)
+        )
+
+        store.reset([.displays, .global, .appearance])
+
+        XCTAssertEqual(store.profiles.count, 2)
+        XCTAssertEqual(store.activeProfile.name, "Custom")
+        XCTAssertNotNil(store.currentDisplayDefaultShortcut)
+        XCTAssertNil(store.profileID(forDisplayID: "external-display"))
+
+        XCTAssertEqual(store.snapModifier, SettingsStore.defaultSettings.snapModifier)
+        XCTAssertEqual(store.spanModifier, SettingsStore.defaultSettings.spanModifier)
+        XCTAssertNil(store.alternateSnapModifier)
+        XCTAssertNil(store.alternateSpanModifier)
+        XCTAssertTrue(store.launchAtLogin)
+        XCTAssertEqual(store.useVisibleFrame, SettingsStore.defaultSettings.useVisibleFrame)
+        XCTAssertEqual(store.restoreSizeOnUnsnap, SettingsStore.defaultSettings.restoreSizeOnUnsnap)
+        XCTAssertEqual(store.appearance, SettingsStore.defaultSettings.appearance)
+
+        store.reset([.profiles])
+
+        XCTAssertEqual(store.profiles, [SettingsStore.defaultProfile])
+        XCTAssertEqual(store.activeProfileID, SettingsStore.defaultProfile.id)
+        XCTAssertNil(store.currentDisplayDefaultShortcut)
+        XCTAssertEqual(store.snapModifier, SettingsStore.defaultSettings.snapModifier)
+    }
+
     func testOnboardingDefaultsToIncompleteForFreshInstall() throws {
         let suiteName = "MacSnapCoreTests-\(UUID().uuidString)"
         let defaults = try XCTUnwrap(UserDefaults(suiteName: suiteName))
