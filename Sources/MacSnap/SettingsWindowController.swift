@@ -156,8 +156,8 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             """,
             rows: [
                 makeProfilesTable(),
-                makeCurrentDisplayDefaultShortcutRow(),
-                makeProfileButtonRow()
+                makeProfileButtonRow(),
+                makeCurrentDisplayDefaultShortcutRow()
             ]
         ))
         stack.addArrangedSubview(makeSection(
