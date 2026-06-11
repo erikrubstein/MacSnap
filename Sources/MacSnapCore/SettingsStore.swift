@@ -584,7 +584,6 @@ public final class SettingsStore {
         )
 
         profiles = existingProfiles + [profile]
-        activeProfileID = profile.id
         return profile
     }
 

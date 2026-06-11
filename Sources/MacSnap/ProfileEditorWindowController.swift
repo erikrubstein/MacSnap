@@ -91,16 +91,16 @@ final class ProfileEditorWindowController: NSWindowController, NSTextFieldDelega
         stack.addArrangedSubview(makeSliderRow(label: "Columns", slider: columnsSlider, valueLabel: columnsValueLabel, min: 1, max: 12))
         stack.addArrangedSubview(makeSliderRow(label: "Gap", slider: gapSlider, valueLabel: gapValueLabel, min: 0, max: 80))
         stack.addArrangedSubview(makeShortcutRow(
-            label: "Make Default",
-            field: defaultShortcutField,
-            role: .defaultProfile,
-            clearAction: #selector(clearDefaultShortcutClicked)
-        ))
-        stack.addArrangedSubview(makeShortcutRow(
             label: "Apply",
             field: displayShortcutField,
             role: .display,
             clearAction: #selector(clearDisplayShortcutClicked)
+        ))
+        stack.addArrangedSubview(makeShortcutRow(
+            label: "Make Default",
+            field: defaultShortcutField,
+            role: .defaultProfile,
+            clearAction: #selector(clearDefaultShortcutClicked)
         ))
         stack.setCustomSpacing(24, after: stack.arrangedSubviews.last!)
         stack.addArrangedSubview(makeButtonRow())

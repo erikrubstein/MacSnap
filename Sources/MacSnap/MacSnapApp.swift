@@ -291,18 +291,6 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
         }
 
         for profile in settingsStore.profiles {
-            if let shortcut = profile.defaultShortcut {
-                profileHotKeyManager?.register(
-                    keyCode: shortcut.keyCode,
-                    modifiers: shortcut.modifiers,
-                    label: "Switch default profile to '\(profile.name)'"
-                ) { [weak self] in
-                    Task { @MainActor in
-                        self?.switchToProfile(id: profile.id)
-                    }
-                }
-            }
-
             if let shortcut = profile.displayShortcut {
                 profileHotKeyManager?.register(
                     keyCode: shortcut.keyCode,
@@ -311,6 +299,18 @@ final class MacSnapApp: NSObject, NSApplicationDelegate {
                 ) { [weak self] in
                     Task { @MainActor in
                         self?.switchCurrentDisplayToProfile(id: profile.id)
+                    }
+                }
+            }
+
+            if let shortcut = profile.defaultShortcut {
+                profileHotKeyManager?.register(
+                    keyCode: shortcut.keyCode,
+                    modifiers: shortcut.modifiers,
+                    label: "Switch default profile to '\(profile.name)'"
+                ) { [weak self] in
+                    Task { @MainActor in
+                        self?.switchToProfile(id: profile.id)
                     }
                 }
             }

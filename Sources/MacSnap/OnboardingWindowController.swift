@@ -273,7 +273,9 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
 
         contentStack.addArrangedSubview(makeInstruction("1", "Hold \(draftSnapModifier.displayName) and drag a window."))
         contentStack.addArrangedSubview(makeInstruction("2", "Move over the grid cell you want, then release the window."))
-        contentStack.addArrangedSubview(makeInstruction("3", "Press \(draftSpanModifier.displayName) while snapping to toggle span mode for multi-cell layouts."))
+        let spanInstruction = makeInstruction("3", "Press \(draftSpanModifier.displayName) while snapping to toggle span mode for multi-cell layouts.")
+        contentStack.addArrangedSubview(spanInstruction)
+        contentStack.setCustomSpacing(20, after: spanInstruction)
         contentStack.addArrangedSubview(makeCallout(
             title: "You can change this anytime",
             text: "Use the MacSnap menu bar icon to reopen Setup or change everything in Settings."
@@ -286,22 +288,26 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         stack.alignment = .leading
         stack.spacing = 6
         stack.edgeInsets = NSEdgeInsets(top: 14, left: 14, bottom: 14, right: 14)
+        stack.wantsLayer = true
+        stack.layer?.backgroundColor = NSColor.controlBackgroundColor.withAlphaComponent(0.55).cgColor
+        stack.layer?.borderColor = NSColor.separatorColor.withAlphaComponent(0.35).cgColor
+        stack.layer?.borderWidth = 1
+        stack.layer?.cornerRadius = 6
+        stack.setContentHuggingPriority(.required, for: .vertical)
+        stack.setContentCompressionResistancePriority(.required, for: .vertical)
+        stack.widthAnchor.constraint(equalToConstant: 540).isActive = true
 
         let titleLabel = NSTextField(labelWithString: title)
         titleLabel.font = .systemFont(ofSize: 15, weight: .semibold)
         let textLabel = NSTextField(wrappingLabelWithString: text)
         textLabel.textColor = .secondaryLabelColor
         textLabel.widthAnchor.constraint(equalToConstant: 500).isActive = true
+        textLabel.maximumNumberOfLines = 0
+        textLabel.setContentCompressionResistancePriority(.required, for: .vertical)
 
         stack.addArrangedSubview(titleLabel)
         stack.addArrangedSubview(textLabel)
-
-        let box = NSBox()
-        box.boxType = .primary
-        box.title = ""
-        box.contentView = stack
-        box.widthAnchor.constraint(equalToConstant: 540).isActive = true
-        return box
+        return stack
     }
 
     private func makeButtonRow(_ buttons: [NSButton]) -> NSView {
@@ -362,14 +368,21 @@ final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
         row.orientation = .horizontal
         row.alignment = .top
         row.spacing = 12
+        row.setContentHuggingPriority(.required, for: .vertical)
+        row.setContentCompressionResistancePriority(.required, for: .vertical)
 
         let badge = NSTextField(labelWithString: number)
         badge.font = .monospacedDigitSystemFont(ofSize: 13, weight: .semibold)
         badge.alignment = .center
         badge.widthAnchor.constraint(equalToConstant: 22).isActive = true
+        badge.setContentCompressionResistancePriority(.required, for: .vertical)
 
         let label = NSTextField(wrappingLabelWithString: text)
+        label.maximumNumberOfLines = 0
+        label.lineBreakMode = .byWordWrapping
         label.widthAnchor.constraint(equalToConstant: 490).isActive = true
+        label.setContentHuggingPriority(.required, for: .vertical)
+        label.setContentCompressionResistancePriority(.required, for: .vertical)
 
         row.addArrangedSubview(badge)
         row.addArrangedSubview(label)

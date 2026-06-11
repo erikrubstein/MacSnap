@@ -149,7 +149,7 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
             help: """
             Profiles are reusable grid layouts. Rows and columns define the grid, and gap adds spacing around snapped windows.
 
-            Optional shortcuts can be set for each profile. "Make Default" makes that profile the new default profile, while "Apply" applies that profile to the current display.
+            Optional shortcuts can be set for each profile. "Apply" applies that profile to the current display, while "Make Default" makes that profile the new default profile.
 
             "Apply Default Profile" removes the manual assignment from the display under your mouse, so that display goes back to using the default profile.
             """,
@@ -334,8 +334,8 @@ final class SettingsWindowController: NSWindowController, NSTableViewDataSource,
         addColumn(id: Column.name, title: "Name", width: 190)
         addColumn(id: Column.grid, title: "Grid", width: 90)
         addColumn(id: Column.gap, title: "Gap", width: 60)
-        addColumn(id: Column.defaultShortcut, title: "Make Default", width: 165)
         addColumn(id: Column.displayShortcut, title: "Apply", width: 165)
+        addColumn(id: Column.defaultShortcut, title: "Make Default", width: 165)
 
         let scrollView = NSScrollView()
         scrollView.hasVerticalScroller = true

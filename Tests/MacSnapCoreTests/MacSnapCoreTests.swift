@@ -136,10 +136,11 @@ final class MacSnapCoreTests: XCTestCase {
         XCTAssertNil(workProfile.displayShortcut)
 
         let secondProfile = store.addProfile()
-        XCTAssertEqual(store.activeProfileID, secondProfile.id)
+        XCTAssertEqual(store.activeProfileID, workProfile.id)
         XCTAssertEqual(store.profiles.count, 2)
         XCTAssertEqual(store.activeProfile.rows, 3)
 
+        store.activeProfileID = secondProfile.id
         store.rows = 1
         store.activeProfileID = workProfile.id
         XCTAssertEqual(store.rows, 3)
